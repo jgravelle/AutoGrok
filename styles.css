@@ -1,0 +1,13 @@
+/* styles.css */
+
+.project-properties {
+    color: #33FFFC;
+    font-weight: bold;
+    text-align: right;
+    width: 100%;
+}
+
+.timestamp {
+    text-align: right;
+    width: 100%;
+}

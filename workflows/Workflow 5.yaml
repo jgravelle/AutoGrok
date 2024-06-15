@@ -1,0 +1,85 @@
+agents: []
+created_at: '2024-06-14T09:29:45.917764'
+description: This workflow is used for general purpose tasks.
+groupchat_config: {}
+id: null
+name: Workflow 5
+receiver:
+  agents: []
+  config:
+    code_execution_config: null
+    default_auto_reply: ''
+    description: A primary assistant agent that writes plans and code to solve tasks.
+      booger
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: OpenAI model configuration
+        model: gpt-4o
+        timestamp: '2024-05-14T08:19:12.425322'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: primary_assistant
+    system_message: '...'
+  groupchat_config: {}
+  timestamp: '2024-06-14T09:29:45.917764'
+  tools:
+  - content: '...'
+    description: null
+    file_name: fetch_web_content.json
+    timestamp: '2024-05-14T08:19:12.425322'
+    title: fetch_web_content
+    user_id: default
+  type: assistant
+  user_id: default
+sender:
+  config:
+    code_execution_config:
+      use_docker: false
+      work_dir: null
+    default_auto_reply: TERMINATE
+    description: A user proxy agent that executes code.
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: OpenAI model configuration
+        model: gpt-4o
+        timestamp: '2024-03-28T06:34:40.214593'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: userproxy
+    system_message: You are a helpful assistant.
+  timestamp: '2024-03-28T06:34:40.214593'
+  tools:
+  - content: '...'
+    description: null
+    file_name: fetch_web_content.json
+    timestamp: '2024-05-14T08:19:12.425322'
+    title: fetch_web_content
+    user_id: default
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-14T09:29:45.917764'
+type: twoagents
+updated_at: null
+user_id: user

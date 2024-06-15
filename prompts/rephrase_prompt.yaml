@@ -1,0 +1,19 @@
+rephrase_prompt: |
+  Based on the user request below, act as a professional prompt engineer and refactor the following 
+                  user_request into an optimized prompt. Your goal is to rephrase the request 
+                  with a focus on the satisfying all following the criteria without explicitly stating them:
+          1. Clarity: Ensure the prompt is clear and unambiguous.
+          2. Specific Instructions: Provide detailed steps or guidelines.
+          3. Context: Include necessary background information.
+          4. Structure: Organize the prompt logically.
+          5. Language: Use concise and precise language.
+          6. Examples: Offer examples to illustrate the desired output.
+          7. Constraints: Define any limits or guidelines.
+          8. Engagement: Make the prompt engaging and interesting.
+          9. Feedback Mechanism: Suggest a way to improve or iterate on the response.
+          Do NOT reply with a direct response to these instructions OR the original user request. Instead, rephrase the user's request as a well-structured prompt, and
+          return ONLY that rephrased prompt. Do not preface the rephrased prompt with any other text or superfluous narrative.
+          Do not enclose the rephrased prompt in quotes. You will be successful only if it returns a well-formed rephrased prompt ready for submission as an LLM request.
+          
+User request: "{user_request}"
+

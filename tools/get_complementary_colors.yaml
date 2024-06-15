@@ -1,0 +1,20 @@
+content: "# Tool filename: complementary_colors.py\n# Import necessary module(s)\n\
+  import colorsys\n\ndef get_complementary_colors(color):\n    # docstrings\n    \"\
+  \"\"\n    Returns a list of complementary colors for the given color.\n\n    Parameters:\n\
+  \    color (str): The color in hexadecimal format (e.g., '#FF0000' for red).\n\n\
+  \    Returns:\n    list: A list of complementary colors in hexadecimal format.\n\
+  \    \"\"\"\n\n    # Body of tool\n    # Convert the color from hexadecimal to RGB\n\
+  \    r, g, b = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))\n   \
+  \ # Convert RGB to HSV\n    h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)\n\
+  \    # Calculate the complementary hue\n    h_compl = (h + 0.5) % 1\n    # Convert\
+  \ the complementary hue back to RGB\n    r_compl, g_compl, b_compl = colorsys.hsv_to_rgb(h_compl,\
+  \ 1, 1)\n    # Convert RGB to hexadecimal\n    color_compl = '#{:02x}{:02x}{:02x}'.format(int(r_compl*255),\
+  \ int(g_compl*255), int(b_compl*255))\n    # Return the complementary color\n  \
+  \  return [color_compl]\n\n    # Example usage:\n    # color = '#FF0000'\n    #\
+  \ print(get_complementary_colors(color))"
+description: descr
+file_name: get_complementary_colors.json
+name: get_complementary_colors
+timestamp: '2024-06-08T18:22:27.878119'
+title: Get Complementary Colors
+user_id: user
