@@ -319,7 +319,7 @@ def sidebar_begin():
     if DEBUG:
         print("sidebar_begin()")
 
-    st.sidebar.title("AutoGrok™ - Universal AI Agents Made Easy.  Eventually." )
+    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
     st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
     st.sidebar.write("No need to report what's broken, we know.")
     # display_project_dropdown()  
