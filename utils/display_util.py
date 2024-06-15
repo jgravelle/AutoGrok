@@ -237,6 +237,8 @@ def display_main():
                     except Exception as e:
                         st.error(f"Error retrieving available models: {str(e)}")
 
+            selected_framework = st.selectbox("Default Framework", ["Autogen", "CrewAI", "Bob's Agent Maker", "AI-Mart", "Geeks'R'Us"], key="default_framework")
+
         with debugTab:
             # Display the debug tab content
             if DEBUG:
