@@ -1,0 +1,12 @@
+# config_local.py
+
+# User-specific configurations
+
+LLM_PROVIDER = "Groq_Provider"
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+LMSTUDIO_API_URL = "http://localhost:1234/v1/chat/completions"
+OLLAMA_API_URL = "http://127.0.0.1:11434/api/generate"
+# OPENAI_API_KEY = "your_openai_api_key"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+
+DEBUG = True
