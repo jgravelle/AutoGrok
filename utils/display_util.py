@@ -110,8 +110,8 @@ def display_main():
         with workflowTab:
             workflow = st.session_state.current_workflow
             col1, col2 = st.columns(2)
-        with col1:
-            display_workflow_dropdown()
+            with col1:
+                display_workflow_dropdown()
                            
             with col2:
                 if st.session_state.current_workflow is not None:
@@ -152,7 +152,7 @@ def display_main():
         with agentTab:
             agent_names = AgentBaseModel.load_agents()
             selected_agent = st.selectbox(
-                "Agents",
+                "Agents - UNDER CONSTRUCTION",
                 ["Select..."] + ["Create manually..."] + ["Create with AI..."] + agent_names,
                 key="agent_dropdown",
                 on_change=handle_agent_selection,
