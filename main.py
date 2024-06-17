@@ -4,7 +4,7 @@ import streamlit as st
 
 from base_models.project_base_model import ProjectBaseModel
 from session_variables import initialize_session_variables
-from utils.display_util import sidebar_begin, display_main
+from utils.display_main_util import sidebar_begin, display_main
 
 
 def main():

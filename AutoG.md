@@ -1116,7 +1116,7 @@ def handle_project_delete():
                 st.session_state.current_project = None
                 st.session_state.project_dropdown = "Select..."
                 st.success(f"Project '{project_name}' has been deleted.")
-                st.experimental_rerun()
+                st.rerun()
     else:
         st.error(f"Project file '{project_file}' not found.")
 

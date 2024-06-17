@@ -76,11 +76,11 @@ def handle_agent_property_change():
         print("handle_agent_property_change()")
     agent = st.session_state.current_agent
     if agent:
-        agent.name = st.session_state[f"agent_name_{agent.name}"]
-        agent.description = st.session_state[f"agent_description_{agent.name}"]
-        agent.role = st.session_state[f"agent_role_{agent.name}"]
-        agent.goal = st.session_state[f"agent_goal_{agent.name}"]
-        agent.backstory = st.session_state[f"agent_backstory_{agent.name}"]
+        agent.name = st.session_state.current_agent.name
+        agent.description = st.session_state.current_agent.description
+        agent.role = st.session_state.current_agent.role
+        agent.goal = st.session_state.current_agent.goal
+        agent.backstory = st.session_state.current_agent.backstory
 
         agent_data = agent.to_dict()
         agent_name = agent.name

@@ -13,6 +13,9 @@ def initialize_session_variables():
     if "current_agent" not in st.session_state:
         st.session_state.current_agent = None
 
+    if "current_framework" not in st.session_state:
+        st.session_state.current_framework = None
+
     if "current_project" not in st.session_state:
         st.session_state.current_project = None
 
