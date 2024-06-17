@@ -3,6 +3,7 @@
 # User-specific configurations
 
 LLM_PROVIDER = "Groq_Provider"
+DEFAULT_MODEL = "llama3-8b-8192"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 LMSTUDIO_API_URL = "http://localhost:1234/v1/chat/completions"
 OLLAMA_API_URL = "http://127.0.0.1:11434/api/generate"

@@ -1,10 +1,11 @@
 generate_agent_prompt: |
   Based on the rephrased agent request below, please do the following:
   1. Do step-by-step reasoning and think to better understand the request.
-  2. Code the best Autogen Studio Python agent as per the request as a [agent_name].py file.
-  3. Return only the agent file, no commentary, intro, or other extra text. If there ARE any non-code lines, 
+  2. Code the best Autogen Studio Python agent as per the request.
+  3. Always include the agent filename in the format `# Agent filename: [agent_name].py` as the first line of the code.
+  4. Return only the agent code, no commentary, intro, or other extra text. If there ARE any non-code lines, 
       please pre-pend them with a '#' symbol to comment them out.
-  4. A proper agent will have these parts:
+  5. A proper agent will have these parts:
      a. Imports (import libraries needed for the agent)
      b. Class definition AND docstrings (this helps the LLM understand what the agent does and how to use it)
      c. Class methods (the actual code that implements the agent's behavior)
@@ -16,7 +17,7 @@ generate_agent_prompt: |
      class Agent:
          # docstrings
          """
-         Name:
+                :
          The name of the agent.
          An agent that performs tasks based on the given request.
          Methods:

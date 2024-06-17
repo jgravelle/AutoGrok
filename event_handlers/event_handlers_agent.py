@@ -10,6 +10,14 @@ from base_models.agent_base_model import AgentBaseModel
 from configs.config_local import DEBUG
 
 
+def handle_agent_close():
+    if DEBUG:
+        print("handle_agent_close()")
+    st.session_state.current_agent = None
+    st.session_state.agent_dropdown = "Select..."
+    st.rerun()
+
+
 def handle_ai_agent_creation():
     if DEBUG:
         print("handle_ai_agent_creation()")
@@ -35,25 +43,30 @@ def handle_ai_agent_creation():
 
         try:
             response = provider.send_request({"model": model, "messages": [{"role": "user", "content": prompt}]})
-            agent_data = provider.process_response(response)["choices"][0]["message"]["content"]
-            if DEBUG:
-                print(f"Generated agent data:\n{agent_data}")   
+            agent_code = provider.process_response(response)["choices"][0]["message"]["content"]
 
-            agent_name_match = re.search(r"# (\w+)\.py", agent_data)
+            # Extract the agent name from the generated code
+            agent_name_match = re.search(r"# Agent filename: (\w+)\.py", agent_code)
             if agent_name_match:
                 agent_name = agent_name_match.group(1)
-                agent_data_dict = {
-                    "name": agent_name,
-                    "config": {"name": agent_name},
-                    "tools": [],
-                    "code": agent_data
-                }
-                agent = AgentBaseModel.create_agent(agent_name, agent_data_dict)
-                st.session_state.current_agent = agent
-                st.session_state.agent_dropdown = agent_name
-                st.success(f"Agent '{agent_name}' created successfully!")
             else:
-                st.error("Failed to extract the agent name from the generated data.")
+                class_name_match = re.search(r"class (\w+):", agent_code)
+                if class_name_match:
+                    agent_name = class_name_match.group(1)
+                else:
+                    st.error("Failed to extract the agent name or class name from the generated code.")
+                    return
+
+            agent_data = {
+                "name": agent_name,
+                "config": {"name": agent_name},
+                "skills": [],
+                "code": agent_code
+            }
+            agent = AgentBaseModel.create_agent(agent_name, agent_data)
+            st.session_state.current_agent = agent
+            st.session_state.agent_dropdown = agent_name
+            st.success(f"Agent '{agent_name}' created successfully!")
         except Exception as e:
             st.error(f"Error generating the agent: {str(e)}")
 

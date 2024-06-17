@@ -35,6 +35,12 @@ from configs.config_local import LLM_PROVIDER
 
 def initialize_session_variables():
 
+    if "available_models" not in st.session_state:
+        st.session_state.available_models = []
+
+    if "current_agent" not in st.session_state:
+        st.session_state.current_agent = None
+
     if "current_project" not in st.session_state:
         st.session_state.current_project = None
 
@@ -83,6 +89,9 @@ def initialize_session_variables():
 ```python
 # agent_base_model
 
+import os
+import yaml
+
 from base_models.tool_base_model import ToolBaseModel
 from typing import List, Dict, Optional, Callable
 
@@ -91,12 +100,11 @@ class AgentBaseModel:
     def __init__(
         self,
         name: str,
-        description: str,
-        tools: List[Dict],
         config: Dict,
-        role: str,
-        goal: str,
-        backstory: str,
+        skills: List[Dict],
+        role: str = "",
+        goal: str = "",
+        backstory: str = "",
         id: Optional[int] = None,
         created_at: Optional[str] = None,
         updated_at: Optional[str] = None,
@@ -120,9 +128,17 @@ class AgentBaseModel:
     ):
         self.id = id
         self.name = name
-        self.description = description
-        self.tools = [ToolBaseModel(**tool) for tool in tools]
         self.config = config
+        self.description = config.get("description", "")
+        self.skills = [ToolBaseModel(
+            name=skill["title"],
+            title=skill["title"],
+            content=skill["content"],
+            file_name=skill["file_name"],
+            description=skill.get("description"),
+            timestamp=skill.get("timestamp"),
+            user_id=skill.get("user_id")
+        ) for skill in skills]
         self.role = role
         self.goal = goal
         self.backstory = backstory
@@ -151,9 +167,12 @@ class AgentBaseModel:
         return {
             "id": self.id,
             "name": self.name,
-            "description": self.description,
-            "tools": [tool.to_dict() for tool in self.tools],
-            "config": self.config,
+            "config": {
+                "name": self.name,
+                "description": self.description,
+                # ... other config values ...
+            },
+            "skills": [skill.to_dict() for skill in self.skills],
             "role": self.role,
             "goal": self.goal,
             "backstory": self.backstory,
@@ -183,10 +202,9 @@ class AgentBaseModel:
     def from_dict(cls, data: Dict):
         return cls(
             id=data.get("id"),
-            name=data["name"],
-            description=data["description"],
-            tools=data["tools"],
+            name=data["config"]["name"],
             config=data["config"],
+            skills=data["skills"],
             role=data.get("role", ""),
             goal=data.get("goal", ""),
             backstory=data.get("backstory", ""),
@@ -210,6 +228,35 @@ class AgentBaseModel:
             step_callback=data.get("step_callback"),
             cache=data.get("cache", True)
         )
+    
+    @classmethod
+    def create_agent(cls, agent_name: str, agent_data: Dict) -> "AgentBaseModel":
+        agent = cls.from_dict(agent_data)
+        
+        # Create a YAML file for the agent
+        with open(f"agents/{agent_name}.yaml", "w") as file:
+            yaml.dump(agent_data, file)
+        
+        return agent
+
+    @classmethod
+    def get_agent(cls, agent_name: str) -> "AgentBaseModel":
+        file_path = f"agents/{agent_name}.yaml"
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                agent_data = yaml.safe_load(file)
+                return cls.from_dict(agent_data)
+        else:
+            raise FileNotFoundError(f"Agent file not found: {file_path}")
+
+    @staticmethod
+    def load_agents() -> List[str]:
+        agent_names = []
+        for file in os.listdir("agents"):
+            if file.endswith(".yaml"):
+                agent_name = file[:-5]  # Remove the ".yaml" extension
+                agent_names.append(agent_name)
+        return agent_names
     
 ```
 
@@ -858,6 +905,7 @@ MODEL_CHOICES = {
 # User-specific configurations
 
 LLM_PROVIDER = "Groq_Provider"
+DEFAULT_MODEL = "llama3-8b-8192"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 LMSTUDIO_API_URL = "http://localhost:1234/v1/chat/completions"
 OLLAMA_API_URL = "http://127.0.0.1:11434/api/generate"
@@ -865,6 +913,147 @@ OLLAMA_API_URL = "http://127.0.0.1:11434/api/generate"
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 DEBUG = True
+```
+
+# event_handlers\event_handlers_agent.py
+
+```python
+# event_handlers_agent.py
+
+import importlib
+import re
+import streamlit as st
+import yaml
+
+from datetime import datetime
+from base_models.agent_base_model import AgentBaseModel
+from configs.config_local import DEBUG
+
+
+def handle_agent_close():
+    if DEBUG:
+        print("handle_agent_close()")
+    st.session_state.current_agent = None
+    st.session_state.agent_dropdown = "Select..."
+    st.rerun()
+    
+
+def handle_ai_agent_creation():
+    if DEBUG:
+        print("handle_ai_agent_creation()")
+    agent_creation_input = st.session_state.agent_creation_input.strip()
+    if agent_creation_input:
+        # Load the generate_agent_prompt from the file
+        with open("prompts/generate_agent_prompt.yaml", "r") as file:
+            prompt_data = yaml.safe_load(file)
+            if prompt_data is not None and "generate_agent_prompt" in prompt_data:
+                generate_agent_prompt = prompt_data["generate_agent_prompt"]
+            else:
+                st.error("Failed to load the agent prompt.")
+                return
+
+        # Combine the generate_agent_prompt with the user input
+        prompt = f"{generate_agent_prompt}\n\nRephrased agent request: {agent_creation_input}"
+
+        # Dynamically import the provider class based on the selected provider name
+        provider_module = importlib.import_module(f"providers.{st.session_state.default_provider.lower()}")
+        provider_class = getattr(provider_module, st.session_state.default_provider)
+        provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
+        model = st.session_state.selected_model
+
+        try:
+            response = provider.send_request({"model": model, "messages": [{"role": "user", "content": prompt}]})
+            agent_data = provider.process_response(response)["choices"][0]["message"]["content"]
+            if DEBUG:
+                print(f"Generated agent data:\n{agent_data}")   
+
+            agent_name_match = re.search(r"# (\w+)\.py", agent_data)
+            if agent_name_match:
+                agent_name = agent_name_match.group(1)
+                agent_data_dict = {
+                    "name": agent_name,
+                    "config": {"name": agent_name},
+                    "tools": [],
+                    "code": agent_data
+                }
+                agent = AgentBaseModel.create_agent(agent_name, agent_data_dict)
+                st.session_state.current_agent = agent
+                st.session_state.agent_dropdown = agent_name
+                st.success(f"Agent '{agent_name}' created successfully!")
+            else:
+                st.error("Failed to extract the agent name from the generated data.")
+        except Exception as e:
+            st.error(f"Error generating the agent: {str(e)}")
+
+
+def handle_agent_property_change():
+    if DEBUG:
+        print("handle_agent_property_change()")
+    agent = st.session_state.current_agent
+    if agent:
+        agent.name = st.session_state[f"agent_name_{agent.name}"]
+        agent.description = st.session_state[f"agent_description_{agent.name}"]
+        agent.role = st.session_state[f"agent_role_{agent.name}"]
+        agent.goal = st.session_state[f"agent_goal_{agent.name}"]
+        agent.backstory = st.session_state[f"agent_backstory_{agent.name}"]
+
+        agent_data = agent.to_dict()
+        agent_name = agent.name
+        with open(f"agents/{agent_name}.yaml", "w") as file:
+            yaml.dump(agent_data, file)
+
+
+def handle_agent_selection():
+    if DEBUG:
+        print("handle_agent_selection()")
+    selected_agent = st.session_state.agent_dropdown
+    if selected_agent == "Select...":
+        return
+    if selected_agent == "Create manually...":
+        # Handle manual agent creation
+        agent_name = st.session_state.agent_name_input.strip()
+        if agent_name:
+            agent_data = {
+                "name": agent_name,
+                "description": "",
+                "role": "",
+                "goal": "",
+                "backstory": "",
+                "tools": [],
+                "config": {},
+                "timestamp": datetime.now().isoformat(),
+                "user_id": "default"
+            }
+            agent = AgentBaseModel.from_dict(agent_data)
+            AgentBaseModel.create_agent(agent_name, agent)
+            st.session_state.current_agent = agent
+            st.session_state.agent_dropdown = agent_name
+    elif selected_agent == "Create with AI...":
+        # Clear the current agent selection
+        st.session_state.current_agent = None
+    else:
+        # Load the selected agent
+        agent = AgentBaseModel.get_agent(selected_agent)
+        st.session_state.current_agent = agent
+
+
+def handle_agent_name_change():
+    if DEBUG:
+        print("handle_agent_name_change()")
+    new_agent_name = st.session_state.agent_name_edit.strip()
+    if new_agent_name:
+        st.session_state.current_agent.name = new_agent_name
+        update_agent()
+
+
+def update_agent():
+    if DEBUG:
+        print("update_agent()")
+    st.session_state.current_agent.updated_at = datetime.now().isoformat()
+    agent_name = st.session_state.current_agent.name
+    agent_data = st.session_state.current_agent.to_dict()
+    with open(f"agents/{agent_name}.yaml", "w") as file:
+        yaml.dump(agent_data, file)
 ```
 
 # event_handlers\event_handlers_project.py
@@ -1164,6 +1353,14 @@ def handle_ai_tool_creation():
                 st.error("Failed to extract the tool name from the generated code.")
         except Exception as e:
             st.error(f"Error generating the tool: {str(e)}")
+
+
+def handle_tool_close():
+    if DEBUG:
+        print("handle_tool_close()")
+    st.session_state.current_tool = None
+    st.session_state.tool_dropdown = "Select..."
+    st.rerun()
 
 
 def handle_tool_property_change():
@@ -1828,6 +2025,9 @@ from base_models.project_base_model import (
 from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
 from datetime import datetime
+from event_handlers.event_handlers_agent import (
+    handle_agent_close, handle_agent_selection, handle_ai_agent_creation, handle_agent_property_change
+    )
 from event_handlers.event_handlers_project import (
     handle_project_collaborators_change, handle_project_close, 
     handle_project_description_change, handle_project_due_date_change, 
@@ -1837,7 +2037,7 @@ from event_handlers.event_handlers_project import (
 )
 from event_handlers.event_handlers_settings import handle_default_provider_change, load_provider_classes
 from event_handlers.event_handlers_tool import (
-    handle_ai_tool_creation, handle_tool_property_change, handle_tool_selection, 
+    handle_ai_tool_creation, handle_tool_close, handle_tool_property_change, handle_tool_selection, 
 )
 from event_handlers.event_handlers_workflow import (
     handle_workflow_close, handle_workflow_description_change, 
@@ -1920,128 +2120,158 @@ def display_main():
             #     handle_project_attachments_change()
 
 
-        with workflowTab:
-            workflow = st.session_state.current_workflow
-            col1, col2 = st.columns(2)
+    with workflowTab:
+        workflow = st.session_state.current_workflow
+        col1, col2 = st.columns(2)
         with col1:
             display_workflow_dropdown()
-                           
-            with col2:
-                if st.session_state.current_workflow is not None:
-                    st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>WORKFLOW PROPERTIES</div>", unsafe_allow_html=True)
-                    if workflow.created_at:
-                        created_at = datetime.fromisoformat(workflow.created_at).strftime("%B %d, %Y %I:%M %p")
-                        st.write(f"<div style='text-align:right; width:100%;'>Created At: {created_at}</div>", unsafe_allow_html=True)
-                    if workflow.updated_at:
-                        updated_at = datetime.fromisoformat(workflow.updated_at).strftime("%B %d, %Y %I:%M %p")
-                        st.write(f"<div style='text-align:right; width:100%;'>Updated At: {updated_at}</div>", unsafe_allow_html=True)
-
-
-            # Display the properties of the current workflow
+                        
+        with col2:
             if st.session_state.current_workflow is not None:
-                workflow = st.session_state.current_workflow
-                st.write(f"Name: {workflow.name}")
-                workflow.description = st.text_area("Description:", value=workflow.description or "", key="tab2_workflow_description", on_change=handle_workflow_description_change)
-                workflow.type = st.text_input("Type:", value=workflow.type, key="tab2_workflow_type", on_change=handle_workflow_type_change)
-                workflow.summary_method = st.text_input("Summary Method:", value=workflow.summary_method, key="tab2_workflow_summary_method", on_change=handle_workflow_summary_method_change)
+                st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>WORKFLOW PROPERTIES</div>", unsafe_allow_html=True)
+                if workflow.created_at:
+                    created_at = datetime.fromisoformat(workflow.created_at).strftime("%B %d, %Y %I:%M %p")
+                    st.write(f"<div style='text-align:right; width:100%;'>Created At: {created_at}</div>", unsafe_allow_html=True)
+                if workflow.updated_at:
+                    updated_at = datetime.fromisoformat(workflow.updated_at).strftime("%B %d, %Y %I:%M %p")
+                    st.write(f"<div style='text-align:right; width:100%;'>Updated At: {updated_at}</div>", unsafe_allow_html=True)
 
-                # Add more workflow properties as needed
 
-                # Display agents, sender, and receiver information
-                st.write("Agents:")
-                for agent in workflow.agents:
-                    st.write(f"- {agent.name}")
+        # Display the properties of the current workflow
+        if st.session_state.current_workflow is not None:
+            workflow = st.session_state.current_workflow
+            st.write(f"Name: {workflow.name}")
+            workflow.description = st.text_area("Description:", value=workflow.description or "", key="tab2_workflow_description", on_change=handle_workflow_description_change)
+            workflow.type = st.text_input("Type:", value=workflow.type, key="tab2_workflow_type", on_change=handle_workflow_type_change)
+            workflow.summary_method = st.text_input("Summary Method:", value=workflow.summary_method, key="tab2_workflow_summary_method", on_change=handle_workflow_summary_method_change)
 
-                with st.container(border=True):
-                    st.write("Sender:")
-                    st.write(f"Type: {workflow.sender.type}")
-                    st.write(f"User ID: {workflow.sender.user_id}")
+            # Add more workflow properties as needed
 
-                with st.container(border=True):
-                    st.write("Receiver:")
-                    st.write(f"Type: {workflow.receiver.type}")
-                    st.write(f"User ID: {workflow.receiver.user_id}")
+            # Display agents, sender, and receiver information
+            st.write("Agents:")
+            for agent in workflow.agents:
+                st.write(f"- {agent.name}")
 
-        with agentTab:
-            # Display the agents tab content
-            st.write("Agents Tab")
+            with st.container(border=True):
+                st.write("Sender:")
+                st.write(f"Type: {workflow.sender.type}")
+                st.write(f"User ID: {workflow.sender.user_id}")
 
-        with toolTab:
-            tool_names = ToolBaseModel.load_tools()
-            selected_tool = st.selectbox(
-                "Tools",
-                ["Select..."] + ["Create manually..."] + ["Create with AI..."] + tool_names,
-                key="tool_dropdown",
-                on_change=handle_tool_selection,
-            )
+            with st.container(border=True):
+                st.write("Receiver:")
+                st.write(f"Type: {workflow.receiver.type}")
+                st.write(f"User ID: {workflow.receiver.user_id}")
 
-            if selected_tool == "Create manually...":
-                # Show the manual tool creation input field
-                st.text_input("Tool Name:", key="tool_name_input", on_change=handle_tool_selection)
-            elif selected_tool == "Create with AI...":
-                # Show the AI-assisted tool creation input field
-                st.text_input("What should this new tool do?", key="tool_creation_input", on_change=handle_ai_tool_creation)
+    with agentTab:
+        display_agent_dropdown()
 
-            if st.session_state.current_tool is not None:
-                # Display the properties of the current tool
-                tool = st.session_state.current_tool
-                st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>TOOL PROPERTIES</div>", unsafe_allow_html=True)
-                st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {tool.timestamp}</div>", unsafe_allow_html=True)
-                
-                tool.name = st.text_input("Name:", value=tool.name, key=f"tool_name_{tool.name}", on_change=handle_tool_property_change)
-                tool.content = st.text_area("Content:", value=tool.content, key=f"tool_content_{tool.name}", on_change=handle_tool_property_change)
-                tool.title = st.text_input("Title:", value=tool.title, key=f"tool_title_{tool.name}", on_change=handle_tool_property_change)
-                tool.description = st.text_input("Description:", value=tool.description or "", key=f"tool_description_{tool.name}", on_change=handle_tool_property_change)
-                tool.file_name = st.text_input("File Name:", value=tool.file_name, key=f"tool_file_name_{tool.name}", on_change=handle_tool_property_change)
-                tool.user_id = st.text_input("User ID:", value=tool.user_id, key=f"tool_user_id_{tool.name}", on_change=handle_tool_property_change)
+        if st.session_state.current_agent is not None:
+            # Display the properties of the current agent
+            agent = st.session_state.current_agent
+            st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>AGENT PROPERTIES</div>", unsafe_allow_html=True)
+            st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {agent.timestamp}</div>", unsafe_allow_html=True)
 
-        with settingsTab:
-            st.write("Settings")
+            agent.description = st.text_area("Description:", value=agent.description or "", key=f"agent_description_{agent.name}", on_change=handle_agent_property_change)
+            agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
+            agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
+            agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
+
+    with toolTab:
+        display_tool_dropdown()
+
+        if st.session_state.current_tool is not None:
+            # Display the properties of the current tool
+            tool = st.session_state.current_tool
+            st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>TOOL PROPERTIES</div>", unsafe_allow_html=True)
+            st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {tool.timestamp}</div>", unsafe_allow_html=True)
             
-            provider_classes = load_provider_classes()
-            default_provider = st.session_state.default_provider if st.session_state.default_provider else ""
-            default_provider_index = provider_classes.index(default_provider) if default_provider in provider_classes else 0
-            selected_provider = st.selectbox("Default Provider", provider_classes, index=default_provider_index, key="default_provider", on_change=handle_default_provider_change)
+            tool.content = st.text_area("Content:", value=tool.content, key=f"tool_content_{tool.name}", on_change=handle_tool_property_change)
+            tool.title = st.text_input("Title:", value=tool.title, key=f"tool_title_{tool.name}", on_change=handle_tool_property_change)
+            tool.description = st.text_input("Description:", value=tool.description or "", key=f"tool_description_{tool.name}", on_change=handle_tool_property_change)
+            tool.file_name = st.text_input("File Name:", value=tool.file_name, key=f"tool_file_name_{tool.name}", on_change=handle_tool_property_change)
+            tool.user_id = st.text_input("User ID:", value=tool.user_id, key=f"tool_user_id_{tool.name}", on_change=handle_tool_property_change)
 
-            if selected_provider:
-                tmp = "_Provider"
-                api_key = st.text_input("API Key:", type="password")
-                st.session_state.default_provider_key = api_key
+    with settingsTab:
+        st.write("Settings")
+        
+        provider_classes = load_provider_classes()
+        default_provider = st.session_state.default_provider if st.session_state.default_provider else ""
+        default_provider_index = provider_classes.index(default_provider) if default_provider in provider_classes else 0
+        selected_provider = st.selectbox("Default Provider", provider_classes, index=default_provider_index, key="default_provider", on_change=handle_default_provider_change)
 
-                if st.session_state.default_provider_key or os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
-                    if os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
-                        st.session_state.default_provider_key = os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY")
+        if selected_provider:
+            tmp = "_Provider"
+            api_key = st.text_input("Default Provider's API Key:", type="password")
+            st.session_state.default_provider_key = api_key
 
-                    provider_module = importlib.import_module(f"providers.{selected_provider.lower()}")
-                    provider_class = getattr(provider_module, selected_provider)
-                    provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
-                    
-                    try:
-                        available_models = provider.get_available_models()
-                        available_models = sorted(available_models)
-                        selected_model = st.selectbox("Select Model", available_models)
-                        st.session_state.selected_model = selected_model
-                    except Exception as e:
-                        st.error(f"Error retrieving available models: {str(e)}")
+            if st.session_state.default_provider_key or os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
+                if os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
+                    st.session_state.default_provider_key = os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY")
 
-        with debugTab:
-            # Display the debug tab content
-            if DEBUG:
-                st.write("Debug Information")
+                provider_module = importlib.import_module(f"providers.{selected_provider.lower()}")
+                provider_class = getattr(provider_module, selected_provider)
+                provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
                 
-                # Iterate over all session state variables
-                for key, value in st.session_state.items():
-                    
-                    # Check if the value is an instance of specific classes
-                    if isinstance(value, (ProjectBaseModel, WorkflowBaseModel, AgentBaseModel, ToolBaseModel)):
-                        # Display the properties and values of the object
-                        for prop, prop_value in value.__dict__.items():
-                            st.write(f"{prop}: {prop_value}")
-                    else:
-                        # Display the value directly
-                        st.write(f"{key}:\n\r {value}")
-                    
-                    st.write("---")
+                try:
+                    if not st.session_state.available_models or len(st.session_state.available_models) == 0:
+                        available_models = provider.get_available_models()
+                    available_models = sorted(available_models)
+                    selected_model = st.selectbox("Select Default Model", available_models)
+                    st.session_state.selected_model = selected_model
+                except Exception as e:
+                    st.error(f"Error retrieving available models: {str(e)}")
+
+        selected_framework = st.selectbox("Default Framework", ["Autogen", "CrewAI", "Bob's Agent Maker", "AI-Mart", "Geeks'R'Us"], key="default_framework")
+
+    with debugTab:
+        # Display the debug tab content
+        if DEBUG:
+            st.write("Debug Information")
+            
+            # Iterate over all session state variables
+            for key, value in st.session_state.items():
+                
+                # Check if the value is an instance of specific classes
+                if isinstance(value, (ProjectBaseModel, WorkflowBaseModel, AgentBaseModel, ToolBaseModel)):
+                    # Display the properties and values of the object
+                    for prop, prop_value in value.__dict__.items():
+                        st.write(f"{prop}: {prop_value}")
+                else:
+                    # Display the value directly
+                    st.write(f"{key}:\n\r {value}")
+                
+                st.write("---")
+
+def display_agent_dropdown():
+    if DEBUG:
+        print("display_agent_dropdown()")
+    if st.session_state.current_agent is None:
+        # Display the agents dropdown
+        agent_names = AgentBaseModel.load_agents()
+        selected_agent = st.selectbox(
+            "Agents",
+            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + agent_names,
+            key="agent_dropdown",
+            on_change=handle_agent_selection,
+        )
+
+        if selected_agent == "Select...":
+            return
+        if selected_agent == "Create manually...":
+            # Show the manual agent creation input field
+            st.text_input("Agent Name:", key="agent_name_input", on_change=handle_agent_selection)
+        elif selected_agent == "Create with AI...":
+            # Show the AI-assisted agent creation input field
+            st.text_input("What should this new agent do?", key="agent_creation_input", on_change=handle_ai_agent_creation)
+    else:
+        st.session_state.current_agent.name = st.text_input(
+            "Agent Name:",
+            value=st.session_state.current_agent.name,
+            key="agent_name_edit",
+            on_change=handle_agent_property_change,
+        )
+        if st.button("CLOSE THIS AGENT"):
+            handle_agent_close()
 
 
 def display_project_dropdown():
@@ -2072,6 +2302,38 @@ def display_project_dropdown():
         )
         if st.button("CLOSE THIS PROJECT"):
             handle_project_close()
+
+
+def display_tool_dropdown():
+    if DEBUG:
+        print("display_tool_dropdown()")
+    if st.session_state.current_tool is None:
+        # Display the tools dropdown
+        tool_names = ToolBaseModel.load_tools()
+        selected_tool = st.selectbox(
+            "Tools",
+            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + tool_names,
+            key="tool_dropdown",
+            on_change=handle_tool_selection,
+        )
+
+        if selected_tool == "Select...":
+            return
+        if selected_tool == "Create manually...":
+            # Show the manual tool creation input field
+            st.text_input("Tool Name:", key="tool_name_input", on_change=handle_tool_selection)
+        elif selected_tool == "Create with AI...":
+            # Show the AI-assisted tool creation input field
+            st.text_input("What should this new tool do?", key="tool_creation_input", on_change=handle_ai_tool_creation)
+    else:
+        st.session_state.current_tool.name = st.text_input(
+            "Tool Name:",
+            value=st.session_state.current_tool.name,
+            key="tool_name_edit",
+            on_change=handle_tool_property_change,
+        )
+        if st.button("CLOSE THIS TOOL"):
+            handle_tool_close()
 
 
 def display_workflow_dropdown():
@@ -2106,7 +2368,9 @@ def sidebar_begin():
     if DEBUG:
         print("sidebar_begin()")
 
-    st.sidebar.title("AutoGrok™")
+    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
+    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
+    st.sidebar.write("No need to report what's broken, we know.")
     # display_project_dropdown()  
     # display_workflow_dropdown()
     
@@ -3215,7 +3479,7 @@ def save_webpage_as_text(url, output_filename):
 # #         print(title, link, snippet)
 ```
 
-# agents\agent_primary_assistant.yaml
+# agents\primary_assistant.yaml
 
 ```yaml
 type: assistant
@@ -3324,30 +3588,57 @@ workflows:
 
 ```
 
-# projects\Test2.yaml
+# prompts\generate_agent_prompt.yaml
 
 ```yaml
-attachments: []
-collaborators:
-- ''
-created_at: '2024-06-14T09:30:34.238852'
-deliverables: []
-description: ''
-due_date: null
-id: 1
-name: Test2
-notes: ''
-priority: none
-prompt: ''
-status: not started
-tags: []
-tools: []
-updated_at: '2024-06-14T09:43:03.898846'
-user_id: user
-workflows:
-- Workflow 5
-- Workflow1
-
+generate_agent_prompt: |
+  Based on the rephrased agent request below, please do the following:
+  1. Do step-by-step reasoning and think to better understand the request.
+  2. Code the best Autogen Studio Python agent as per the request as a [agent_name].py file.
+  3. Return only the agent file, no commentary, intro, or other extra text. If there ARE any non-code lines, 
+      please pre-pend them with a '#' symbol to comment them out.
+  4. A proper agent will have these parts:
+     a. Imports (import libraries needed for the agent)
+     b. Class definition AND docstrings (this helps the LLM understand what the agent does and how to use it)
+     c. Class methods (the actual code that implements the agent's behavior)
+     d. (optional) Example usage - ALWAYS commented out
+     Here is an example of a well formatted agent:
+     # Agent filename: [agent_name].py
+     # Import necessary module(s)
+     import necessary_module
+     class Agent:
+         # docstrings
+         """
+                :
+         The name of the agent.
+         An agent that performs tasks based on the given request.
+         Methods:
+         perform_task(args): Executes the task as per the request.
+         """
+         def init(self, init_params):
+             """
+             Initializes the Agent with the given parameters.
+             Parameters:
+             init_params (type): Description of initialization parameters.
+             """
+             # Initialize with given parameters
+             self.init_params = init_params
+         def perform_task(self, task_params):
+             """
+             Executes the task based on the given parameters.
+             Parameters:
+             task_params (type): Description of task parameters.
+             Returns:
+             return_type: Description of the return value.
+             """
+             # Body of the method
+             # Implement the task logic here
+             pass
+     # Example usage:
+     # agent = Agent(init_params)
+     # result = agent.perform_task(task_params)
+     # print(result)
+  Rephrased agent request: "{rephrased_agent_request}"
 ```
 
 # prompts\generate_tool_prompt.yaml
@@ -3449,173 +3740,6 @@ name: find_anagram
 timestamp: '2024-06-14T15:58:21.264031'
 title: find_anagram
 user_id: default
-
-```
-
-# tools\get_complementary_colors.yaml
-
-```yaml
-content: "# Tool filename: complementary_colors.py\n# Import necessary module(s)\n\
-  import colorsys\n\ndef get_complementary_colors(color):\n    # docstrings\n    \"\
-  \"\"\n    Returns a list of complementary colors for the given color.\n\n    Parameters:\n\
-  \    color (str): The color in hexadecimal format (e.g., '#FF0000' for red).\n\n\
-  \    Returns:\n    list: A list of complementary colors in hexadecimal format.\n\
-  \    \"\"\"\n\n    # Body of tool\n    # Convert the color from hexadecimal to RGB\n\
-  \    r, g, b = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))\n   \
-  \ # Convert RGB to HSV\n    h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)\n\
-  \    # Calculate the complementary hue\n    h_compl = (h + 0.5) % 1\n    # Convert\
-  \ the complementary hue back to RGB\n    r_compl, g_compl, b_compl = colorsys.hsv_to_rgb(h_compl,\
-  \ 1, 1)\n    # Convert RGB to hexadecimal\n    color_compl = '#{:02x}{:02x}{:02x}'.format(int(r_compl*255),\
-  \ int(g_compl*255), int(b_compl*255))\n    # Return the complementary color\n  \
-  \  return [color_compl]\n\n    # Example usage:\n    # color = '#FF0000'\n    #\
-  \ print(get_complementary_colors(color))"
-description: descr
-file_name: get_complementary_colors.json
-name: get_complementary_colors
-timestamp: '2024-06-08T18:22:27.878119'
-title: Get Complementary Colors
-user_id: user
-
-```
-
-# tools\get_opposite_color.yaml
-
-```yaml
-content: "# Tool filename: get_opposite_color.py\n# Import necessary module(s)\nimport\
-  \ webcolors\n\ndef get_opposite_color(color):\n    \"\"\"\n    Accepts a color and\
-  \ returns its opposite.\n\n    Parameters:\n    color (str): The hex code or common\
-  \ name of the color (e.g., '#FFFFFF' or 'white').\n\n    Returns:\n    str: The\
-  \ hex code of the opposite color.\n    \"\"\"\n\n    # Convert the color to RGB\n\
-  \    if color.startswith('#'):\n        rgb_color = webcolors.hex_to_rgb(color)\n\
-  \    else:\n        rgb_color = webcolors.name_to_rgb(color)\n\n    # Calculate\
-  \ the opposite color\n    opposite_rgb = (255 - rgb_color.red, 255 - rgb_color.green,\
-  \ 255 - rgb_color.blue)\n    opposite_hex = webcolors.rgb_to_hex(opposite_rgb)\n\
-  \n    return opposite_hex\n\n# Example usage:\n# color = '#000000'\n# print(get_opposite_color(color))\
-  \  # Outputs: '#FFFFFF'\n# color_name = 'red'\n# print(get_opposite_color(color_name))\
-  \  # Outputs: '#00FFFF'"
-description: null
-file_name: get_opposite_color.json
-name: get_opposite_color
-timestamp: '2024-06-14T20:30:50.599352'
-title: get_opposite_color
-user_id: default
-
-```
-
-# tools\next_three_fibonacci_numbers.yaml
-
-```yaml
-content: "# Tool filename: next_three_fibonacci_numbers.py\n# Import necessary module(s)\n\
-  \ndef next_three_fibonacci_numbers(n):\n    # docstrings\n    \"\"\"\n    Given\
-  \ a number, return the next three numbers in a Fibonacci sequence.\n\n    Parameters:\n\
-  \    n (int): A number in the Fibonacci sequence.\n\n    Returns:\n    list: A list\
-  \ containing the next three Fibonacci numbers.\n    \"\"\"\n    \n    # Body of\
-  \ tool\n\n    # Function to find the next Fibonacci number\n    def next_fibonacci(a,\
-  \ b):\n        return a + b\n\n    # Find the first two Fibonacci numbers preceding\
-  \ `n`\n    a, b = 0, 1\n    while b < n:\n        a, b = b, a + b\n    \n    # If\
-  \ `n` is not a Fibonacci number, find the closest previous Fibonacci number\n  \
-  \  if b != n:\n        a, b = 0, 1\n        while b < n:\n            a, b = b,\
-  \ a + b\n    \n    # Compute the next three Fibonacci numbers\n    fib1 = next_fibonacci(a,\
-  \ b)\n    fib2 = next_fibonacci(b, fib1)\n    fib3 = next_fibonacci(fib1, fib2)\n\
-  \    \n    return [fib1, fib2, fib3]\n\n# Example usage:\n# n = 5\n# print(next_three_fibonacci_numbers(n))\
-  \  # Output: [8, 13, 21]"
-description: null
-file_name: next_three_fibonacci_numbers.json
-name: next_three_fibonacci_numbers
-timestamp: '2024-06-15T06:11:37.970483'
-title: next_three_fibonacci_numbers
-user_id: default
-
-```
-
-# workflows\Workflow 5.yaml
-
-```yaml
-agents: []
-created_at: '2024-06-14T09:29:45.917764'
-description: This workflow is used for general purpose tasks.
-groupchat_config: {}
-id: null
-name: Workflow 5
-receiver:
-  agents: []
-  config:
-    code_execution_config: null
-    default_auto_reply: ''
-    description: A primary assistant agent that writes plans and code to solve tasks.
-      booger
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-05-14T08:19:12.425322'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: primary_assistant
-    system_message: '...'
-  groupchat_config: {}
-  timestamp: '2024-06-14T09:29:45.917764'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
-  type: assistant
-  user_id: default
-sender:
-  config:
-    code_execution_config:
-      use_docker: false
-      work_dir: null
-    default_auto_reply: TERMINATE
-    description: A user proxy agent that executes code.
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-03-28T06:34:40.214593'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: userproxy
-    system_message: You are a helpful assistant.
-  timestamp: '2024-03-28T06:34:40.214593'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
-  type: userproxy
-  user_id: user
-settings: {}
-summary_method: last
-timestamp: '2024-06-14T09:29:45.917764'
-type: twoagents
-updated_at: null
-user_id: user
 
 ```
 

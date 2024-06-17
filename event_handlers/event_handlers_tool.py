@@ -56,6 +56,14 @@ def handle_ai_tool_creation():
             st.error(f"Error generating the tool: {str(e)}")
 
 
+def handle_tool_close():
+    if DEBUG:
+        print("handle_tool_close()")
+    st.session_state.current_tool = None
+    st.session_state.tool_dropdown = "Select..."
+    st.rerun()
+
+
 def handle_tool_property_change():
     if DEBUG:
         print("handle_tool_property_change()")
