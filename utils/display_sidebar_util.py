@@ -3,8 +3,11 @@
 import streamlit as st
 
 from base_models.project_base_model import ProjectBaseModel
+from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
 from event_handlers.event_handlers_prompt import handle_prompt
+from event_handlers.event_handlers_shared import update_project
+from event_handlers.event_handlers_workflow import update_workflow
 
 
 def display_sidebar_message():
@@ -39,3 +42,9 @@ def handle_sidebar_prompt_reengineer():
         st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
         st.session_state.current_project.create_project("New Project")
         st.session_state.current_project.set_prompt(result_text)
+        st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
+        st.session_state.current_workflow.create_workflow("New Workflow")
+        st.session_state.current_workflow.set_description(user_request + "\n\r" + result_text)
+
+        update_project()
+        update_workflow()

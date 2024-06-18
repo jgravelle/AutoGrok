@@ -1,6 +1,7 @@
 # workflow_base_model
 
 import os
+import streamlit as st
 import yaml
 
 from base_models.agent_base_model import AgentBaseModel
@@ -89,31 +90,45 @@ class Receiver:
 class WorkflowBaseModel:
     def __init__(
         self,
-        name: str,
-        description: str,
-        agents: List[AgentBaseModel],
-        sender: Sender,
-        receiver: Receiver,
-        type: str,
-        user_id: str,
-        timestamp: str,
-        summary_method: str,
+        name: str = "",
+        description: str = "",
+        agents: List[AgentBaseModel] = [],
+        sender: Sender = None,
+        receiver: Receiver = None,
+        type: str = "twoagents",
+        user_id: str = "user",
+        timestamp: str = datetime.now().isoformat(),
+        summary_method: str = "last",
         settings: Dict = None,
         groupchat_config: Dict = None,
         id: Optional[int] = None,
         created_at: Optional[str] = None,
         updated_at: Optional[str] = None,
     ):
-        self.id = id
-        self.name = name
-        self.description = description
-        self.agents = agents
-        self.sender = sender
-        self.receiver = receiver
-        self.type = type
-        self.user_id = user_id
-        self.timestamp = timestamp
-        self.summary_method = summary_method
+        self.id = id or 1
+        self.name = name or "New Workflow"
+        self.description = description or "This workflow is used for general purpose tasks."
+        self.agents = agents or []
+        self.sender = sender or Sender(
+            type="userproxy",
+            config={},
+            timestamp=datetime.now().isoformat(),
+            user_id="user",
+            tools=[],
+        )
+        self.receiver = receiver or Receiver(
+            type="assistant",
+            config={},
+            groupchat_config={},
+            timestamp=datetime.now().isoformat(),
+            user_id="default",
+            tools=[],
+            agents=[],
+        )
+        self.type = type or "twoagents"
+        self.user_id = user_id or "user"
+        self.timestamp = timestamp or datetime.now().isoformat()
+        self.summary_method = summary_method or "last"
         self.settings = settings or {}
         self.groupchat_config = groupchat_config or {}
         self.created_at = created_at or datetime.now().isoformat()
@@ -141,9 +156,12 @@ class WorkflowBaseModel:
     def create_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Creating workflow {workflow_name}")
+
+        current_timestamp = datetime.now().isoformat()
+
         workflow = cls(
             name=workflow_name,
-            description="This workflow is used for general purpose tasks.",
+            description=st.session_state.current_project.prompt if st.session_state.current_project else "This workflow is used for general purpose tasks.",
             agents=[],
             sender=Sender(
                 type="userproxy",
@@ -153,12 +171,12 @@ class WorkflowBaseModel:
                         "config_list": [
                             {
                                 "user_id": "default",
-                                "timestamp": "2024-03-28T06:34:40.214593",
-                                "model": "gpt-4o",
+                                "timestamp": current_timestamp,
+                                "model": st.session_state.selected_model,
                                 "base_url": None,
                                 "api_type": None,
                                 "api_version": None,
-                                "description": "OpenAI model configuration"
+                                "description": f"{st.session_state.default_provider} model configuration"
                             }
                         ],
                         "temperature": 0.1,
@@ -178,15 +196,15 @@ class WorkflowBaseModel:
                     "default_auto_reply": "TERMINATE",
                     "description": "A user proxy agent that executes code."
                 },
-                timestamp="2024-03-28T06:34:40.214593",
-                user_id="user",
-                tools=[
+                timestamp=current_timestamp,
+                user_id=st.session_state.current_project.user_id if st.session_state.current_project else "user",
+                tools=st.session_state.current_project.tools if st.session_state.current_project else [
                     {
                         "title": "fetch_web_content",
                         "content": "...",  # Omitted for brevity
                         "file_name": "fetch_web_content.json",
                         "description": None,
-                        "timestamp": "2024-05-14T08:19:12.425322",
+                        "timestamp": current_timestamp,
                         "user_id": "default"
                     }
                 ]
@@ -199,12 +217,12 @@ class WorkflowBaseModel:
                         "config_list": [
                             {
                                 "user_id": "default",
-                                "timestamp": "2024-05-14T08:19:12.425322",
-                                "model": "gpt-4o",
+                                "timestamp": current_timestamp,
+                                "model": st.session_state.selected_model,
                                 "base_url": None,
                                 "api_type": None,
                                 "api_version": None,
-                                "description": "OpenAI model configuration"
+                                "description": f"{st.session_state.default_provider} model configuration"
                             }
                         ],
                         "temperature": 0.1,
@@ -219,26 +237,26 @@ class WorkflowBaseModel:
                     "is_termination_msg": None,
                     "code_execution_config": None,
                     "default_auto_reply": "",
-                    "description": "A primary assistant agent that writes plans and code to solve tasks. booger"
+                    "description": "A primary assistant agent that writes plans and code to solve tasks."
                 },
                 groupchat_config={},
-                timestamp=datetime.now().isoformat(),
-                user_id="default",
-                tools=[
+                timestamp=current_timestamp,
+                user_id=st.session_state.current_project.user_id if st.session_state.current_project else "default",
+                tools=st.session_state.current_project.tools if st.session_state.current_project else [
                     {
                         "title": "fetch_web_content",
                         "content": "...",  # Omitted for brevity
                         "file_name": "fetch_web_content.json",
                         "description": None,
-                        "timestamp": "2024-05-14T08:19:12.425322",
+                        "timestamp": current_timestamp,
                         "user_id": "default"
                     }
                 ],
                 agents=[]
             ),
             type="twoagents",
-            user_id="user",
-            timestamp=datetime.now().isoformat(),
+            user_id=st.session_state.current_project.user_id if st.session_state.current_project else "user",
+            timestamp=current_timestamp,
             summary_method="last"
         )
 
@@ -248,6 +266,7 @@ class WorkflowBaseModel:
             yaml.dump(workflow_data, file)
 
         return workflow
+
     
     @classmethod
     def from_dict(cls, data: Dict):
@@ -294,3 +313,6 @@ class WorkflowBaseModel:
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
         return project_names
+    
+    def set_description(self, description: str):
+        self.description = description  

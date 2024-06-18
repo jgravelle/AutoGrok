@@ -596,35 +596,35 @@ class Receiver:
 class WorkflowBaseModel:
     def __init__(
         self,
-        name: str,
-        description: str,
-        agents: List[AgentBaseModel],
-        sender: Sender,
-        receiver: Receiver,
-        type: str,
-        user_id: str,
-        timestamp: str,
-        summary_method: str,
+        name: str = "",
+        description: str = "",
+        agents: List[AgentBaseModel] = [],
+        sender: Sender = Sender,
+        receiver: Receiver = Receiver,
+        type: str = "twoagents",
+        user_id: str = "user",
+        timestamp: str = datetime.now().isoformat(),
+        summary_method: str = "last",
         settings: Dict = None,
         groupchat_config: Dict = None,
         id: Optional[int] = None,
         created_at: Optional[str] = None,
         updated_at: Optional[str] = None,
     ):
-        self.id = id
-        self.name = name
-        self.description = description
-        self.agents = agents
-        self.sender = sender
-        self.receiver = receiver
-        self.type = type
-        self.user_id = user_id
-        self.timestamp = timestamp
-        self.summary_method = summary_method
-        self.settings = settings or {}
-        self.groupchat_config = groupchat_config or {}
-        self.created_at = created_at or datetime.now().isoformat()
-        self.updated_at = updated_at
+        self.id = id or 1
+        self.name = name or "New Workflow"
+        self.description = description or "This workflow is used for general purpose tasks."
+        self.agents = agents or []
+        self.sender = sender or Sender
+        self.receiver = receiver or Receiver
+        self.type = type or "twoagents"
+        self.user_id = user_id or "user"
+        self.timestamp = timestamp or datetime.now().isoformat()
+        self.summary_method = summary_method or "last"
+        self.settings = settings or {} # Settings for the workflow
+        self.groupchat_config = groupchat_config or {} # Group chat configuration
+        self.created_at = created_at or datetime.now().isoformat() # Created at timestamp
+        self.updated_at = updated_at # Updated at timestamp
 
     def to_dict(self):
         return {
@@ -801,6 +801,9 @@ class WorkflowBaseModel:
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
         return project_names
+    
+    def set_description(self, description: str):
+        self.description = description  
 ```
 
 # configs\config.py
@@ -2402,8 +2405,11 @@ def display_settings():
 import streamlit as st
 
 from base_models.project_base_model import ProjectBaseModel
+from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
 from event_handlers.event_handlers_prompt import handle_prompt
+from event_handlers.event_handlers_shared import update_project
+from event_handlers.event_handlers_workflow import update_workflow
 
 
 def display_sidebar_message():
@@ -2438,6 +2444,12 @@ def handle_sidebar_prompt_reengineer():
         st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
         st.session_state.current_project.create_project("New Project")
         st.session_state.current_project.set_prompt(result_text)
+        st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
+        st.session_state.current_workflow.create_workflow("New Workflow")
+        st.session_state.current_workflow.set_description(user_request)
+
+        update_project()
+        update_workflow()
 
 ```
 
@@ -3778,44 +3790,32 @@ skills:
 
 ```yaml
 attachments: []
-collaborators:
-- ''
-created_at: '2024-06-18T10:10:37.567064'
+collaborators: []
+created_at: '2024-06-18T11:08:39.605429'
 deliverables: []
-description: ''
+description: null
 due_date: null
 id: 1
 name: New Project
-notes: ''
+notes: null
 priority: none
-prompt: 'Design an intuitive mobile application for tracking and analyzing stock market
-  performance, incorporating features for users to:
-
-
-  * Monitor real-time stock prices and trends
-
-  * Set personalized watchlists for easy tracking
-
-  * Receive notifications for price movements and market events
-
-  * Access historical data for informed investment decisions
-
-  * Visualize stock performance with interactive charts and graphs
-
-  * Integrate with financial news sources for comprehensive insights
-
-
-  Please generate a user-friendly interface, including at least three main screens:
-  Home, Portfolio, and News. The app should be responsive, with a clean design that
-  adapts to various device screen sizes. Consider implementing a feature to recommend
-  stocks based on market trends and user portfolio performance.'
+prompt: "Design a digital calculator that accurately performs mathematical operations,\
+  \ including addition, subtraction, multiplication, and division, with the ability\
+  \ to handle decimal points and negative numbers. Consider the user's experience\
+  \ by incorporating an intuitive interface, clear numerical displays, and a history\
+  \ of previous calculations. Provide a sample calculation scenario to demonstrate\
+  \ the calculator's capabilities. Consider the following constraints: \n\n* The calculator\
+  \ must be able to handle at least two decimal places.\n* The user should be able\
+  \ to easily switch between basic arithmetic operations.\n* Include a \"Clear\" button\
+  \ to reset the calculator for new calculations.\n* Incorporate a \"history\" feature\
+  \ to display the previous calculations.\n* Ensure the calculator is user-friendly\
+  \ and visually appealing.\n* Provide an example calculation: 5.25 + 2.8 = ?"
 status: not started
 tags: []
 tools: []
-updated_at: '2024-06-18T10:11:01.235246'
+updated_at: '2024-06-18T11:08:39.614366'
 user_id: user
-workflows:
-- Workflow1
+workflows: []
 
 ```
 
@@ -3998,6 +3998,97 @@ name: find_anagram
 timestamp: '2024-06-14T15:58:21.264031'
 title: find_anagram
 user_id: default
+
+```
+
+# workflows\New Workflow.yaml
+
+```yaml
+agents: []
+created_at: '2024-06-18T11:08:39.608369'
+description: This workflow is used for general purpose tasks.
+groupchat_config: {}
+id: 1
+name: New Workflow
+receiver:
+  agents: []
+  config:
+    code_execution_config: null
+    default_auto_reply: ''
+    description: A primary assistant agent that writes plans and code to solve tasks.
+      booger
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: OpenAI model configuration
+        model: gpt-4o
+        timestamp: '2024-05-14T08:19:12.425322'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: primary_assistant
+    system_message: '...'
+  groupchat_config: {}
+  timestamp: '2024-06-18T11:08:39.608369'
+  tools:
+  - content: '...'
+    description: null
+    file_name: fetch_web_content.json
+    timestamp: '2024-05-14T08:19:12.425322'
+    title: fetch_web_content
+    user_id: default
+  type: assistant
+  user_id: default
+sender:
+  config:
+    code_execution_config:
+      use_docker: false
+      work_dir: null
+    default_auto_reply: TERMINATE
+    description: A user proxy agent that executes code.
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: OpenAI model configuration
+        model: gpt-4o
+        timestamp: '2024-03-28T06:34:40.214593'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: userproxy
+    system_message: You are a helpful assistant.
+  timestamp: '2024-03-28T06:34:40.214593'
+  tools:
+  - content: '...'
+    description: null
+    file_name: fetch_web_content.json
+    timestamp: '2024-05-14T08:19:12.425322'
+    title: fetch_web_content
+    user_id: default
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-18T11:08:39.608369'
+type: twoagents
+updated_at: null
+user_id: user
 
 ```
 
