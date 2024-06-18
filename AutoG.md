@@ -1225,6 +1225,48 @@ def handle_prompt_change():
 
 ```
 
+# event_handlers\event_handlers_prompt.py
+
+```python
+# event_handlers_prompt.py
+
+import importlib
+import streamlit as st
+import yaml
+
+from configs.config_local import DEBUG
+
+def handle_prompt(user_request, prompt_file_path, prompt_label):
+    if DEBUG:
+        print(f"handle_prompt()\n\r - User request: {user_request}\n\r Prompt file path: {prompt_file_path}\n\r Prompt label: {prompt_label}")
+    if user_request:
+        # Load the prompt from the file
+        with open(prompt_file_path, "r") as file:
+            prompt_data = yaml.safe_load(file)
+            prompt = prompt_data[prompt_label]
+
+        # Dynamically import the provider class based on the selected provider name
+        provider_module = importlib.import_module(f"providers.{st.session_state.default_provider.lower()}")
+        provider_class = getattr(provider_module, st.session_state.default_provider)
+        provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
+        model = st.session_state.selected_model
+
+        try:
+            # Replace '{user_request}' in the prompt with the actual user's request
+            formatted_prompt = prompt.replace("{user_request}", user_request)
+            if DEBUG:
+                print(f"Formatted prompt: {formatted_prompt}")
+            # Send the formatted prompt to the provider
+            response = provider.send_request({"model": model, "messages": [{"role": "user", "content": formatted_prompt}]})
+            result_text = provider.process_response(response)["choices"][0]["message"]["content"]
+            return result_text
+        except Exception as e:
+            st.error(f"Error processing the request: {str(e)}")
+    return None
+
+
+```
+
 # event_handlers\event_handlers_settings.py
 
 ```python
@@ -2122,7 +2164,7 @@ from utils.display_debug_util import display_debug
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
-from utils.display_sidebar_util import display_sidebar_prompt_reengineer
+from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
 from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
 from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
 
@@ -2181,6 +2223,7 @@ def display_main():
 
 #   SIDEBAR
 def sidebar_begin():
+    display_sidebar_message()
     display_sidebar_prompt_reengineer()
 ```
 
@@ -2356,56 +2399,38 @@ def display_settings():
 ```python
 # display_sidebar_util.py
 
-import importlib
-import yaml
 import streamlit as st
 
 from configs.config_local import DEBUG
+from event_handlers.event_handlers_prompt import handle_prompt
+
+
+def display_sidebar_message():
+    if DEBUG:
+        print("display_sidebar_message()")
+    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
+    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
+    st.sidebar.write("No need to report what's broken, we know.")
+
+
+def display_sidebar_prompt_reengineer():
+    if DEBUG:
+        print("display_sidebar_prompt_reengineer()")
+    
+    # Create the input field in the sidebar
+    st.sidebar.text_area("Quickstart - Enter your project request:", key="sidebar_prompt_input", on_change=(handle_sidebar_prompt_reengineer))
+
+    # Display the rephrased request if available
+    if "sidebar_prompt_output" in st.session_state:
+        st.sidebar.text_area("Rephrased Request:", value=st.session_state.sidebar_prompt_output, height=200)
 
 def handle_sidebar_prompt_reengineer():
     if DEBUG:
         print("handle_sidebar_prompt_reengineer()")
     user_request = st.session_state.sidebar_prompt_input.strip()
-    if user_request:
-        # Load the rephrase_prompt from the file
-        with open("prompts/rephrase_prompt.yaml", "r") as file:
-            prompt_data = yaml.safe_load(file)
-            rephrase_prompt = prompt_data["rephrase_prompt"]
-
-        # Dynamically import the provider class based on the selected provider name
-        provider_module = importlib.import_module(f"providers.{st.session_state.default_provider.lower()}")
-        provider_class = getattr(provider_module, st.session_state.default_provider)
-        provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
-        model = st.session_state.selected_model
-
-        try:
-            # Replace '{user_request}' in rephrase_prompt with the actual user's request
-            formatted_prompt = rephrase_prompt.replace("{user_request}", user_request)
-            if DEBUG:
-                print(f"Formatted prompt: {formatted_prompt}")
-            # Send the formatted prompt to the provider
-            response = provider.send_request({"model": model, "messages": [{"role": "user", "content": formatted_prompt}]})
-            rephrased_request = provider.process_response(response)["choices"][0]["message"]["content"]
-            
-            # Update the session state with the rephrased request
-            st.session_state.sidebar_prompt_output = rephrased_request
-        except Exception as e:
-            st.sidebar.error(f"Error processing the request: {str(e)}")
-
-def display_sidebar_prompt_reengineer():
-    if DEBUG:
-        print("display_sidebar_prompt_reengineer()")
-
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
-    st.sidebar.write("No need to report what's broken, we know.")
-    
-    # Create the input field in the sidebar
-    st.sidebar.text_area("Quickstart - Enter your project request:", key="sidebar_prompt_input", on_change=handle_sidebar_prompt_reengineer)
-
-    # Display the rephrased request if available
-    if "sidebar_prompt_output" in st.session_state:
-        st.sidebar.text_area("Rephrased Request:", value=st.session_state.sidebar_prompt_output, height=200)
+    result_text = handle_prompt(user_request, "prompts/rephrase_prompt.yaml", "rephrase_prompt")
+    if result_text:
+        st.session_state.sidebar_prompt_output = result_text
 ```
 
 # utils\display_tool_util.py

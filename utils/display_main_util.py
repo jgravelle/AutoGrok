@@ -8,7 +8,7 @@ from utils.display_debug_util import display_debug
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
-from utils.display_sidebar_util import display_sidebar_prompt_reengineer
+from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
 from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
 from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
 
@@ -67,4 +67,5 @@ def display_main():
 
 #   SIDEBAR
 def sidebar_begin():
+    display_sidebar_message()
     display_sidebar_prompt_reengineer()
