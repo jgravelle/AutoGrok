@@ -2101,7 +2101,7 @@ def display_agent_dropdown():
         agent_names = AgentBaseModel.load_agents()
         selected_agent = st.selectbox(
             "Agents",
-            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + agent_names,
+            ["Select..."] + ["Create with AI..."] + ["Create manually..."] + agent_names,
             key="agent_dropdown",
             on_change=handle_agent_selection,
         )
@@ -2145,6 +2145,7 @@ def display_agent_properties():
 # display_debug_util.py
 
 import streamlit as st
+import yaml
 
 from base_models.agent_base_model import AgentBaseModel
 from base_models.tool_base_model import ToolBaseModel
@@ -2158,19 +2159,61 @@ def display_debug():
     if DEBUG:
         st.write("Debug Information")
         
-    # Iterate over all session state variables
-    for key, value in st.session_state.items():
+        # Create expanders for each object type
+        project_expander = st.expander("Project")
+        workflow_expander = st.expander("Workflow")
+        agent_expander = st.expander("Agent")
+        tool_expander = st.expander("Tool")
+        other_expander = st.expander("Other")
         
-        # Check if the value is an instance of specific classes
-        if isinstance(value, (ProjectBaseModel, WorkflowBaseModel, AgentBaseModel, ToolBaseModel)):
-            # Display the properties and values of the object
-            for prop, prop_value in value.__dict__.items():
-                st.write(f"{prop}: {prop_value}")
-        else:
-            # Display the value directly
-            st.write(f"{key}:\n\r {value}")
-        
-        st.write("---")
+        # Iterate over all session state variables
+        for key, value in st.session_state.items():
+            
+            # Check if the value is an instance of specific classes
+            if isinstance(value, ProjectBaseModel):
+                with project_expander:
+                    st.write(f"### {key}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        for prop, prop_value in value.__dict__.items():
+                            st.write(f"- **{prop}:** {prop_value}")
+                    with col2:
+                        st.write(f"```yaml\n{yaml.dump(value.to_dict())}\n```")
+                        
+            elif isinstance(value, WorkflowBaseModel):
+                with workflow_expander:
+                    st.write(f"### {key}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        for prop, prop_value in value.__dict__.items():
+                            st.write(f"- **{prop}:** {prop_value}")
+                    with col2:
+                        st.write(f"```yaml\n{yaml.dump(value.to_dict())}\n```")
+                        
+            elif isinstance(value, AgentBaseModel):
+                with agent_expander:
+                    st.write(f"### {key}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        for prop, prop_value in value.__dict__.items():
+                            st.write(f"- **{prop}:** {prop_value}")
+                    with col2:
+                        st.write(f"```yaml\n{yaml.dump(value.to_dict())}\n```")
+                        
+            elif isinstance(value, ToolBaseModel):
+                with tool_expander:
+                    st.write(f"### {key}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        for prop, prop_value in value.__dict__.items():
+                            st.write(f"- **{prop}:** {prop_value}")
+                    with col2:
+                        st.write(f"```yaml\n{yaml.dump(value.to_dict())}\n```")
+                        
+            else:
+                with other_expander:
+                    st.write(f"### {key}")
+                    st.write(f"```\n{value}\n```")
 ```
 
 # utils\display_main_util.py
@@ -2496,7 +2539,7 @@ def display_tool_dropdown():
         tool_names = ToolBaseModel.load_tools()
         selected_tool = st.selectbox(
             "Tools",
-            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + tool_names,
+            ["Select..."] + ["Create with AI..."] + ["Create manually..."] + tool_names,
             key="tool_dropdown",
             on_change=handle_tool_selection,
         )
@@ -3723,6 +3766,28 @@ def save_webpage_as_text(url, output_filename):
 # #         print(title, link, snippet)
 ```
 
+# agents\Accountant.yaml
+
+```yaml
+code: "# Agent filename: Accountant.py\nimport logging\n\nclass Accountant:\n    \"\
+  \"\"\n        An accountant that performs accounting tasks based on the given request.\n\
+  \        Methods:\n        process_transaction(args): Processes a transaction as\
+  \ per the request.\n    \"\"\"\n    def __init__(self):\n        \"\"\"\n      \
+  \  Initializes the Accountant.\n        \"\"\"\n        self.logger = logging.getLogger(__name__)\n\
+  \n    def process_transaction(self, transaction_data):\n        \"\"\"\n       \
+  \ Processes a transaction based on the given data.\n        Parameters:\n      \
+  \  transaction_data (dict): Contains the transaction details.\n        \"\"\"\n\
+  \        self.logger.info('Processing transaction: {}'.format(transaction_data))\n\
+  \        # Implement transaction processing logic here\n        pass\n    # Example\
+  \ usage:\n    # accountant = Accountant()\n    # accountant.process_transaction({'amount':\
+  \ 100, 'type': 'deposit'})"
+config:
+  name: Accountant
+name: Accountant
+skills: []
+
+```
+
 # agents\primary_assistant.yaml
 
 ```yaml
@@ -3805,62 +3870,31 @@ skills:
 
 ```
 
-# projects\New Project.yaml
+# agents\toadie.yaml
 
 ```yaml
-attachments: []
-collaborators: []
-created_at: '2024-06-18T11:47:33.867291'
-deliverables: []
-description: null
-due_date: null
-id: 1
-name: New Project
-notes: null
-priority: none
-prompt: "Author an original novel of approximately 70,000 words, set in a fictional\
-  \ world with a unique magical system. \n\nImaginary realms are woven together by\
-  \ a mystical fabric, which is fed by the collective dreams of the sleeping population.\
-  \ \n\nIn a world where lucid dreaming is a product of mental discipline, an elite\
-  \ group of \"Weavers\" maintain the balance of these subconscious energies. \n\n\
-  The story follows Arden, a talented yet rebellious Weaver, who discovers a hidden\
-  \ dimension within the dream realm. \n\nWith this newfound power, Arden must navigate\
-  \ treacherous alliances and ancient conspiracies to unravel the dark secrets behind\
-  \ their world's fragile equilibrium.\n\nThe novel should showcase vivid descriptions\
-  \ of the dreamscapes, intricate plot twists, and complex characters."
-status: not started
-tags: []
-tools: []
-updated_at: '2024-06-18T11:47:33.877214'
-user_id: user
-workflows: []
-
-```
-
-# projects\Project1.yaml
-
-```yaml
-attachments: []
-collaborators:
-- ''
-created_at: '2024-06-14T08:29:23.343555'
-deliverables: []
-description: ''
-due_date: null
-id: 1
-name: Project1
-notes: ''
-priority: none
-prompt: Test
-status: not started
-tags: []
-tools: []
-updated_at: '2024-06-14T15:59:17.092849'
-user_id: user
-workflows:
-- Workflow1
-- Workflow 5
-- Workflow 3
+code: "# Agent filename: toadie.py\nimport datetime\nimport random\n\nclass Toadie:\n\
+  \    \"\"\"\n    A general office helper. Toadie.\n    Methods:\n    greet(name):\
+  \ Greets with a friendly message.\n    schedule(name): Schedules a meeting with\
+  \ a random time.\n    order_tea(): Orders tea.\n    \"\"\"\n    def __init__(self):\n\
+  \        \"\"\"\n        Initializes the Toadie.\n        \"\"\"\n        pass\n\
+  \n    def greet(self, name):\n        \"\"\"\n        Greets with a friendly message.\n\
+  \        Parameters:\n        name (str): The name of the person to greet.\n   \
+  \     Returns:\n        str: The greeting message.\n        \"\"\"\n        return\
+  \ f\"Hello, {name}! Today is {datetime.date.today()}.\"\n\n    def schedule(self,\
+  \ name):\n        \"\"\"\n        Schedules a meeting with a random time.\n    \
+  \    Parameters:\n        name (str): The name of the person who is scheduling the\
+  \ meeting.\n        Returns:\n        str: The meeting schedule.\n        \"\"\"\
+  \n        time = datetime.time(random.randint(9, 17), random.randint(0, 59))\n \
+  \       return f\"Your meeting with {name} is scheduled for {time} today.\"\n\n\
+  \    def order_tea(self):\n        \"\"\"\n        Orders tea.\n        \"\"\"\n\
+  \        return \"Tea ordered!\"\n\n    # Example usage:\n    # agent = Toadie()\n\
+  \    # name = \"John\"\n    # print(agent.greet(name))\n    # print(agent.schedule(name))\n\
+  \    # print(agent.order_tea())"
+config:
+  name: toadie
+name: toadie
+skills: []
 
 ```
 
@@ -4019,21 +4053,70 @@ user_id: default
 
 ```
 
+# workflows\Accounting Workflow.yaml
+
+```yaml
+agents: []
+created_at: '2024-06-18T15:19:27.051419'
+description: "Create a small business online accounting application\n\rDevelop a comprehensive\
+  \ online accounting application for small businesses, featuring a user-friendly\
+  \ interface and robust features to streamline financial management, including:\n\
+  \n* Automated invoicing and payment tracking\n* Accurate expense categorization\
+  \ and reporting\n* Real-time budgeting and cash flow monitoring\n* Secure access\
+  \ and data backup capabilities\n* Multi-user support for accountants and administrators\n\
+  \nExample functional requirements include:\n\n* Accurately calculate and display\
+  \ profit margins, revenue, and net income\n* Enable financial reporting and analysis\
+  \ with customizable dashboards\n* Integrate with existing accounting software (e.g.,\
+  \ QuickBooks) for seamless data import/export\n* Implement security measures, such\
+  \ as password protection and two-factor authentication, to ensure data confidentiality\n\
+  \nPlease design and outline the core features, architecture, and user interface\
+  \ of this online accounting application, considering scalability, maintainability,\
+  \ and user adoption."
+groupchat_config: {}
+id: 1
+name: Accounting Workflow
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-18T15:19:27.051419'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-18T15:19:27.051419'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-18T15:08:11.026067'
+type: twoagents
+updated_at: '2024-06-18T15:20:00.311931'
+user_id: user
+
+```
+
 # workflows\New Workflow.yaml
 
 ```yaml
 agents: []
-created_at: '2024-06-18T11:47:33.871217'
-description: "Write a book\n\rAuthor an original novel of approximately 70,000 words,\
-  \ set in a fictional world with a unique magical system. \n\nImaginary realms are\
-  \ woven together by a mystical fabric, which is fed by the collective dreams of\
-  \ the sleeping population. \n\nIn a world where lucid dreaming is a product of mental\
-  \ discipline, an elite group of \"Weavers\" maintain the balance of these subconscious\
-  \ energies. \n\nThe story follows Arden, a talented yet rebellious Weaver, who discovers\
-  \ a hidden dimension within the dream realm. \n\nWith this newfound power, Arden\
-  \ must navigate treacherous alliances and ancient conspiracies to unravel the dark\
-  \ secrets behind their world's fragile equilibrium.\n\nThe novel should showcase\
-  \ vivid descriptions of the dreamscapes, intricate plot twists, and complex characters."
+created_at: '2024-06-18T15:19:27.051419'
+description: "Create a small business online accounting application\n\rDevelop a comprehensive\
+  \ online accounting application for small businesses, featuring a user-friendly\
+  \ interface and robust features to streamline financial management, including:\n\
+  \n* Automated invoicing and payment tracking\n* Accurate expense categorization\
+  \ and reporting\n* Real-time budgeting and cash flow monitoring\n* Secure access\
+  \ and data backup capabilities\n* Multi-user support for accountants and administrators\n\
+  \nExample functional requirements include:\n\n* Accurately calculate and display\
+  \ profit margins, revenue, and net income\n* Enable financial reporting and analysis\
+  \ with customizable dashboards\n* Integrate with existing accounting software (e.g.,\
+  \ QuickBooks) for seamless data import/export\n* Implement security measures, such\
+  \ as password protection and two-factor authentication, to ensure data confidentiality\n\
+  \nPlease design and outline the core features, architecture, and user interface\
+  \ of this online accounting application, considering scalability, maintainability,\
+  \ and user adoption."
 groupchat_config: {}
 id: 1
 name: New Workflow
@@ -4041,112 +4124,21 @@ receiver:
   agents: []
   config: {}
   groupchat_config: {}
-  timestamp: '2024-06-18T11:47:33.871217'
+  timestamp: '2024-06-18T15:19:27.051419'
   tools: []
   type: assistant
   user_id: default
 sender:
   config: {}
-  timestamp: '2024-06-18T11:47:33.871217'
+  timestamp: '2024-06-18T15:19:27.051419'
   tools: []
   type: userproxy
   user_id: user
 settings: {}
 summary_method: last
-timestamp: '2024-06-18T11:47:23.665482'
+timestamp: '2024-06-18T15:08:11.026067'
 type: twoagents
-updated_at: '2024-06-18T11:47:33.878221'
-user_id: user
-
-```
-
-# workflows\Workflow1.yaml
-
-```yaml
-agents: []
-created_at: '2024-06-14T09:31:04.662631'
-description: This workflow is used for general purpose tasks.
-groupchat_config: {}
-id: null
-name: Workflow1
-receiver:
-  agents: []
-  config:
-    code_execution_config: null
-    default_auto_reply: ''
-    description: A primary assistant agent that writes plans and code to solve tasks.
-      booger
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-05-14T08:19:12.425322'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: primary_assistant
-    system_message: '...'
-  groupchat_config: {}
-  timestamp: '2024-06-14T09:31:04.662631'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
-  type: assistant
-  user_id: default
-sender:
-  config:
-    code_execution_config:
-      use_docker: false
-      work_dir: null
-    default_auto_reply: TERMINATE
-    description: A user proxy agent that executes code.
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-03-28T06:34:40.214593'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: userproxy
-    system_message: You are a helpful assistant.
-  timestamp: '2024-03-28T06:34:40.214593'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
-  type: userproxy
-  user_id: user
-settings: {}
-summary_method: last
-timestamp: '2024-06-14T09:31:04.662631'
-type: twoagents
-updated_at: null
+updated_at: '2024-06-18T15:19:27.056459'
 user_id: user
 
 ```

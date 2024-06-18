@@ -16,7 +16,7 @@ def display_agent_dropdown():
         agent_names = AgentBaseModel.load_agents()
         selected_agent = st.selectbox(
             "Agents",
-            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + agent_names,
+            ["Select..."] + ["Create with AI..."] + ["Create manually..."] + agent_names,
             key="agent_dropdown",
             on_change=handle_agent_selection,
         )

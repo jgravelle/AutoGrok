@@ -18,10 +18,16 @@
     width: 100%;
 }
 
-.title {
+h1, .title {
     color: #33FFFC;
     font-size: 1.25em;
     font-weight: bold;
     text-align: center;
     width: 100%;
+}
+
+h3          {
+    color: #f5ff33;
+    font-size: 1em;
+    font-weight: bold;
 }

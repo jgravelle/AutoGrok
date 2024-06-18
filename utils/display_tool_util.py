@@ -19,7 +19,7 @@ def display_tool_dropdown():
         tool_names = ToolBaseModel.load_tools()
         selected_tool = st.selectbox(
             "Tools",
-            ["Select..."] + ["Create manually..."] + ["Create with AI..."] + tool_names,
+            ["Select..."] + ["Create with AI..."] + ["Create manually..."] + tool_names,
             key="tool_dropdown",
             on_change=handle_tool_selection,
         )
