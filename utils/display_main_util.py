@@ -8,6 +8,7 @@ from utils.display_debug_util import display_debug
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
+from utils.display_sidebar_util import display_sidebar_prompt_reengineer
 from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
 from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
 
@@ -21,6 +22,7 @@ def display_main():
     
     projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug"])
 
+#   PROJECTS
     with projectTab:
         project = st.session_state.current_project
         col1, col2 = st.columns(2)
@@ -33,7 +35,7 @@ def display_main():
 
         display_project_properties(project)
 
-
+#   WORKFLOWS
     with workflowTab:
         workflow = st.session_state.current_workflow
         col1, col2 = st.columns(2)
@@ -45,7 +47,7 @@ def display_main():
 
         display_workflow_properties(workflow)
         
-
+#   AGENTS
     with agentTab:
         display_agent_dropdown()
 
@@ -62,13 +64,7 @@ def display_main():
     with debugTab:
         display_debug()
 
-def sidebar_begin():
-    if DEBUG:
-        print("sidebar_begin()")
 
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
-    st.sidebar.write("No need to report what's broken, we know.")
-    # display_project_dropdown()  
-    # display_workflow_dropdown()
-    
+#   SIDEBAR
+def sidebar_begin():
+    display_sidebar_prompt_reengineer()

@@ -7,7 +7,7 @@ import streamlit as st
 
 from base_models.project_base_model import ProjectBaseModel
 from session_variables import initialize_session_variables
-from utils.display_util import sidebar_begin, display_main
+from utils.display_main_util import sidebar_begin, display_main
 
 
 def main():
@@ -40,6 +40,9 @@ def initialize_session_variables():
 
     if "current_agent" not in st.session_state:
         st.session_state.current_agent = None
+
+    if "current_framework" not in st.session_state:
+        st.session_state.current_framework = None
 
     if "current_project" not in st.session_state:
         st.session_state.current_project = None
@@ -936,7 +939,7 @@ def handle_agent_close():
     st.session_state.current_agent = None
     st.session_state.agent_dropdown = "Select..."
     st.rerun()
-    
+
 
 def handle_ai_agent_creation():
     if DEBUG:
@@ -963,25 +966,30 @@ def handle_ai_agent_creation():
 
         try:
             response = provider.send_request({"model": model, "messages": [{"role": "user", "content": prompt}]})
-            agent_data = provider.process_response(response)["choices"][0]["message"]["content"]
-            if DEBUG:
-                print(f"Generated agent data:\n{agent_data}")   
+            agent_code = provider.process_response(response)["choices"][0]["message"]["content"]
 
-            agent_name_match = re.search(r"# (\w+)\.py", agent_data)
+            # Extract the agent name from the generated code
+            agent_name_match = re.search(r"# Agent filename: (\w+)\.py", agent_code)
             if agent_name_match:
                 agent_name = agent_name_match.group(1)
-                agent_data_dict = {
-                    "name": agent_name,
-                    "config": {"name": agent_name},
-                    "tools": [],
-                    "code": agent_data
-                }
-                agent = AgentBaseModel.create_agent(agent_name, agent_data_dict)
-                st.session_state.current_agent = agent
-                st.session_state.agent_dropdown = agent_name
-                st.success(f"Agent '{agent_name}' created successfully!")
             else:
-                st.error("Failed to extract the agent name from the generated data.")
+                class_name_match = re.search(r"class (\w+):", agent_code)
+                if class_name_match:
+                    agent_name = class_name_match.group(1)
+                else:
+                    st.error("Failed to extract the agent name or class name from the generated code.")
+                    return
+
+            agent_data = {
+                "name": agent_name,
+                "config": {"name": agent_name},
+                "skills": [],
+                "code": agent_code
+            }
+            agent = AgentBaseModel.create_agent(agent_name, agent_data)
+            st.session_state.current_agent = agent
+            st.session_state.agent_dropdown = agent_name
+            st.success(f"Agent '{agent_name}' created successfully!")
         except Exception as e:
             st.error(f"Error generating the agent: {str(e)}")
 
@@ -991,11 +999,11 @@ def handle_agent_property_change():
         print("handle_agent_property_change()")
     agent = st.session_state.current_agent
     if agent:
-        agent.name = st.session_state[f"agent_name_{agent.name}"]
-        agent.description = st.session_state[f"agent_description_{agent.name}"]
-        agent.role = st.session_state[f"agent_role_{agent.name}"]
-        agent.goal = st.session_state[f"agent_goal_{agent.name}"]
-        agent.backstory = st.session_state[f"agent_backstory_{agent.name}"]
+        agent.name = st.session_state.current_agent.name
+        agent.description = st.session_state.current_agent.description
+        agent.role = st.session_state.current_agent.role
+        agent.goal = st.session_state.current_agent.goal
+        agent.backstory = st.session_state.current_agent.backstory
 
         agent_data = agent.to_dict()
         agent_name = agent.name
@@ -1726,7 +1734,7 @@ class Groq_Provider(BaseLLMProvider):
     def get_available_models(self):
         if DEBUG:
             print ("GROQ: get_available_models")
-            print (f"KEY: {self.api_key}")
+            #print (f"KEY: {self.api_key}")
         response = requests.get("https://api.groq.com/openai/v1/models", headers={
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -1916,7 +1924,7 @@ class Openai_Provider(BaseLLMProvider):
     def get_available_models(self):
         if DEBUG:
             print ("GROQ: get_available_models")
-            print (f"KEY: {self.api_key}")
+            #print (f"KEY: {self.api_key}")
         response = requests.get("https://api.openai.com/v1/models", headers={
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -2008,239 +2016,18 @@ def get_api_url():
 
 ```
 
-# utils\display_util.py
+# utils\display_agent_util.py
 
 ```python
-# display_util.py
+# display_main_util.py
 
-import importlib
-import os
 import streamlit as st
 
 from base_models.agent_base_model import AgentBaseModel
-from base_models.tool_base_model import ToolBaseModel
-from base_models.project_base_model import (
-    ProjectBaseModel, ProjectPriority, ProjectStatus,
-)
-from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
-from datetime import datetime
 from event_handlers.event_handlers_agent import (
     handle_agent_close, handle_agent_selection, handle_ai_agent_creation, handle_agent_property_change
-    )
-from event_handlers.event_handlers_project import (
-    handle_project_collaborators_change, handle_project_close, 
-    handle_project_description_change, handle_project_due_date_change, 
-    handle_project_name_change, handle_project_notes_change, 
-    handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
-    handle_prompt_change
 )
-from event_handlers.event_handlers_settings import handle_default_provider_change, load_provider_classes
-from event_handlers.event_handlers_tool import (
-    handle_ai_tool_creation, handle_tool_close, handle_tool_property_change, handle_tool_selection, 
-)
-from event_handlers.event_handlers_workflow import (
-    handle_workflow_close, handle_workflow_description_change, 
-    handle_workflow_name_change, handle_workflow_selection, handle_workflow_summary_method_change,
-    handle_workflow_type_change
-)   
-from providers.groq_provider import Groq_Provider
-from providers.openai_provider import Openai_Provider
-
-
-def display_main():
-    if DEBUG:
-        print("called display_main()")
-    
-    with open("styles.css") as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    
-    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug"])
-
-    with projectTab:
-        col1, col2 = st.columns(2)
-        with col1:
-            display_project_dropdown()
-                
-        with col2:
-            if st.session_state.current_project is not None:
-                project = st.session_state.current_project
-                st.write("<div class='project-properties'>PROJECT PROPERTIES</div>", unsafe_allow_html=True)
-                if project.created_at:
-                    created_at = datetime.fromisoformat(project.created_at).strftime("%B %d, %Y %I:%M %p")
-                    st.write(f"<div class='timestamp'>Created At: {created_at}</div>", unsafe_allow_html=True)
-                if project.updated_at:
-                    updated_at = datetime.fromisoformat(project.updated_at).strftime("%B %d, %Y %I:%M %p")
-                    st.write(f"<div class='timestamp'>Updated At: {updated_at}</div>", unsafe_allow_html=True)  
-
-        # Display the properties of the current project
-        if st.session_state.current_project is not None:
-            # Display the name of the first element in the project.workflows array
-            if len(st.session_state.current_project.workflows) > 0:
-                workflow = st.session_state.current_project.workflows[0]
-                st.write(f"<div class='workflow-name'>Workflow: {workflow}</div>", unsafe_allow_html=True)
-            project.prompt = st.text_area("Prompt:", value=project.prompt, key="prompt", on_change=handle_prompt_change)
-            project.description = st.text_area("Description:", value=project.description or "", key="project_description", on_change=handle_project_description_change)
-            status_options = [status.value for status in ProjectStatus]
-            project.status = st.selectbox("Status:", options=status_options, index=status_options.index(project.status), key="project_status", on_change=handle_project_status_change)
-            
-            if project.due_date:
-                if isinstance(project.due_date, str):
-                    due_date_value = datetime.strptime(project.due_date, "%Y-%m-%d").date()
-                else:
-                    due_date_value = project.due_date
-            else:
-                due_date_value = None
-            
-            # Display the date input field
-            due_date = st.date_input("Due Date:", value=due_date_value, key="project_due_date")
-            
-            # Update the project's due date if it has changed
-            if due_date != due_date_value:
-                project.due_date = due_date.strftime("%Y-%m-%d") if due_date else None
-                handle_project_due_date_change()
-            
-            priority_options = [priority.value for priority in ProjectPriority]
-            project.priority = st.selectbox("Priority:", options=priority_options, index=priority_options.index(project.priority), key="project_priority", on_change=handle_project_status_change)
-            st.write(f"Tags: {', '.join(project.tags)}")
-            
-            # Add text input field for notes
-            project.notes = st.text_area("Notes:", value=project.notes or "", key="project_notes", on_change=handle_project_notes_change)
-            collaborators_input = st.text_input("Collaborators:", value=", ".join(project.collaborators), key="project_collaborators", on_change=handle_project_collaborators_change)
-            project.collaborators = [collaborator.strip() for collaborator in collaborators_input.split(",")]
-            project.user_id = st.text_input("User ID:", value=project.user_id or "", key="project_user_id", on_change=handle_project_user_id_change)
-
-            # st.write("Attachments:")
-            # for attachment in project.attachments:
-            #     st.write(f"- {attachment}")
-
-            # new_attachment = st.text_input("Add Attachment:", key="project_new_attachment")
-            # if new_attachment:
-            #     project.attachments.append(new_attachment)
-            #     handle_project_attachments_change()
-
-
-    with workflowTab:
-        workflow = st.session_state.current_workflow
-        col1, col2 = st.columns(2)
-        with col1:
-            display_workflow_dropdown()
-                        
-        with col2:
-            if st.session_state.current_workflow is not None:
-                st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>WORKFLOW PROPERTIES</div>", unsafe_allow_html=True)
-                if workflow.created_at:
-                    created_at = datetime.fromisoformat(workflow.created_at).strftime("%B %d, %Y %I:%M %p")
-                    st.write(f"<div style='text-align:right; width:100%;'>Created At: {created_at}</div>", unsafe_allow_html=True)
-                if workflow.updated_at:
-                    updated_at = datetime.fromisoformat(workflow.updated_at).strftime("%B %d, %Y %I:%M %p")
-                    st.write(f"<div style='text-align:right; width:100%;'>Updated At: {updated_at}</div>", unsafe_allow_html=True)
-
-
-        # Display the properties of the current workflow
-        if st.session_state.current_workflow is not None:
-            workflow = st.session_state.current_workflow
-            st.write(f"Name: {workflow.name}")
-            workflow.description = st.text_area("Description:", value=workflow.description or "", key="tab2_workflow_description", on_change=handle_workflow_description_change)
-            workflow.type = st.text_input("Type:", value=workflow.type, key="tab2_workflow_type", on_change=handle_workflow_type_change)
-            workflow.summary_method = st.text_input("Summary Method:", value=workflow.summary_method, key="tab2_workflow_summary_method", on_change=handle_workflow_summary_method_change)
-
-            # Add more workflow properties as needed
-
-            # Display agents, sender, and receiver information
-            st.write("Agents:")
-            for agent in workflow.agents:
-                st.write(f"- {agent.name}")
-
-            with st.container(border=True):
-                st.write("Sender:")
-                st.write(f"Type: {workflow.sender.type}")
-                st.write(f"User ID: {workflow.sender.user_id}")
-
-            with st.container(border=True):
-                st.write("Receiver:")
-                st.write(f"Type: {workflow.receiver.type}")
-                st.write(f"User ID: {workflow.receiver.user_id}")
-
-    with agentTab:
-        display_agent_dropdown()
-
-        if st.session_state.current_agent is not None:
-            # Display the properties of the current agent
-            agent = st.session_state.current_agent
-            st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>AGENT PROPERTIES</div>", unsafe_allow_html=True)
-            st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {agent.timestamp}</div>", unsafe_allow_html=True)
-
-            agent.description = st.text_area("Description:", value=agent.description or "", key=f"agent_description_{agent.name}", on_change=handle_agent_property_change)
-            agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
-            agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
-            agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
-
-    with toolTab:
-        display_tool_dropdown()
-
-        if st.session_state.current_tool is not None:
-            # Display the properties of the current tool
-            tool = st.session_state.current_tool
-            st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>TOOL PROPERTIES</div>", unsafe_allow_html=True)
-            st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {tool.timestamp}</div>", unsafe_allow_html=True)
-            
-            tool.content = st.text_area("Content:", value=tool.content, key=f"tool_content_{tool.name}", on_change=handle_tool_property_change)
-            tool.title = st.text_input("Title:", value=tool.title, key=f"tool_title_{tool.name}", on_change=handle_tool_property_change)
-            tool.description = st.text_input("Description:", value=tool.description or "", key=f"tool_description_{tool.name}", on_change=handle_tool_property_change)
-            tool.file_name = st.text_input("File Name:", value=tool.file_name, key=f"tool_file_name_{tool.name}", on_change=handle_tool_property_change)
-            tool.user_id = st.text_input("User ID:", value=tool.user_id, key=f"tool_user_id_{tool.name}", on_change=handle_tool_property_change)
-
-    with settingsTab:
-        st.write("Settings")
-        
-        provider_classes = load_provider_classes()
-        default_provider = st.session_state.default_provider if st.session_state.default_provider else ""
-        default_provider_index = provider_classes.index(default_provider) if default_provider in provider_classes else 0
-        selected_provider = st.selectbox("Default Provider", provider_classes, index=default_provider_index, key="default_provider", on_change=handle_default_provider_change)
-
-        if selected_provider:
-            tmp = "_Provider"
-            api_key = st.text_input("Default Provider's API Key:", type="password")
-            st.session_state.default_provider_key = api_key
-
-            if st.session_state.default_provider_key or os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
-                if os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
-                    st.session_state.default_provider_key = os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY")
-
-                provider_module = importlib.import_module(f"providers.{selected_provider.lower()}")
-                provider_class = getattr(provider_module, selected_provider)
-                provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
-                
-                try:
-                    if not st.session_state.available_models or len(st.session_state.available_models) == 0:
-                        available_models = provider.get_available_models()
-                    available_models = sorted(available_models)
-                    selected_model = st.selectbox("Select Default Model", available_models)
-                    st.session_state.selected_model = selected_model
-                except Exception as e:
-                    st.error(f"Error retrieving available models: {str(e)}")
-
-        selected_framework = st.selectbox("Default Framework", ["Autogen", "CrewAI", "Bob's Agent Maker", "AI-Mart", "Geeks'R'Us"], key="default_framework")
-
-    with debugTab:
-        # Display the debug tab content
-        if DEBUG:
-            st.write("Debug Information")
-            
-            # Iterate over all session state variables
-            for key, value in st.session_state.items():
-                
-                # Check if the value is an instance of specific classes
-                if isinstance(value, (ProjectBaseModel, WorkflowBaseModel, AgentBaseModel, ToolBaseModel)):
-                    # Display the properties and values of the object
-                    for prop, prop_value in value.__dict__.items():
-                        st.write(f"{prop}: {prop_value}")
-                else:
-                    # Display the value directly
-                    st.write(f"{key}:\n\r {value}")
-                
-                st.write("---")
 
 def display_agent_dropdown():
     if DEBUG:
@@ -2274,6 +2061,150 @@ def display_agent_dropdown():
             handle_agent_close()
 
 
+def display_agent_properties():
+    if DEBUG:
+        print("display_agent_properties()")
+    agent = st.session_state.current_agent
+    st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>AGENT PROPERTIES</div>", unsafe_allow_html=True)
+    st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {agent.timestamp}</div>", unsafe_allow_html=True)
+
+    agent.description = st.text_area("Description:", value=agent.description or "", key=f"agent_description_{agent.name}", on_change=handle_agent_property_change)
+    agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
+    agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
+    agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
+
+```
+
+# utils\display_debug_util.py
+
+```python
+# display_debug_util.py
+
+import streamlit as st
+
+from base_models.agent_base_model import AgentBaseModel
+from base_models.tool_base_model import ToolBaseModel
+from base_models.project_base_model import ProjectBaseModel
+from base_models.workflow_base_model import WorkflowBaseModel
+
+from configs.config_local import DEBUG
+
+
+def display_debug():
+    if DEBUG:
+        st.write("Debug Information")
+        
+    # Iterate over all session state variables
+    for key, value in st.session_state.items():
+        
+        # Check if the value is an instance of specific classes
+        if isinstance(value, (ProjectBaseModel, WorkflowBaseModel, AgentBaseModel, ToolBaseModel)):
+            # Display the properties and values of the object
+            for prop, prop_value in value.__dict__.items():
+                st.write(f"{prop}: {prop_value}")
+        else:
+            # Display the value directly
+            st.write(f"{key}:\n\r {value}")
+        
+        st.write("---")
+```
+
+# utils\display_main_util.py
+
+```python
+# display_main_util.py
+
+import streamlit as st
+
+from configs.config_local import DEBUG
+
+from utils.display_debug_util import display_debug
+from utils.display_agent_util import display_agent_dropdown, display_agent_properties
+from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
+from utils.display_settings_util import display_settings
+from utils.display_sidebar_util import display_sidebar_prompt_reengineer
+from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
+from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
+
+
+def display_main():
+    if DEBUG:
+        print("called display_main()")
+    
+    with open("styles.css") as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    
+    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug"])
+
+#   PROJECTS
+    with projectTab:
+        project = st.session_state.current_project
+        col1, col2 = st.columns(2)
+        with col1:
+            display_project_dropdown()
+                
+        with col2:
+            if st.session_state.current_project is not None:
+                display_project_timestamps(project)  
+
+        display_project_properties(project)
+
+#   WORKFLOWS
+    with workflowTab:
+        workflow = st.session_state.current_workflow
+        col1, col2 = st.columns(2)
+        with col1:
+            display_workflow_dropdown()
+                        
+        with col2:
+            display_workflow_timestamps(workflow)
+
+        display_workflow_properties(workflow)
+        
+#   AGENTS
+    with agentTab:
+        display_agent_dropdown()
+
+        if st.session_state.current_agent is not None:
+            display_agent_properties()
+
+    with toolTab:
+        display_tool_dropdown()
+        display_tool_properties()
+        
+    with settingsTab:
+        display_settings()
+
+    with debugTab:
+        display_debug()
+
+
+#   SIDEBAR
+def sidebar_begin():
+    display_sidebar_prompt_reengineer()
+```
+
+# utils\display_project_util.py
+
+```python
+# display_project_util.py
+
+import streamlit as st
+
+from base_models.project_base_model import (
+    ProjectBaseModel, ProjectPriority, ProjectStatus,
+)
+from configs.config_local import DEBUG
+from datetime import datetime
+from event_handlers.event_handlers_project import (
+    handle_project_collaborators_change, handle_project_close, 
+    handle_project_description_change, handle_project_due_date_change, 
+    handle_project_name_change, handle_project_notes_change, 
+    handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
+    handle_prompt_change
+)
+
+
 def display_project_dropdown():
     if DEBUG:
         print("display_project_dropdown()")
@@ -2302,6 +2233,195 @@ def display_project_dropdown():
         )
         if st.button("CLOSE THIS PROJECT"):
             handle_project_close()
+
+
+def display_project_properties(project):
+    if DEBUG:
+        print("display_project_properties()")
+    # Display the properties of the current project
+    if st.session_state.current_project is not None:
+        # Display the name of the first element in the project.workflows array
+        if len(st.session_state.current_project.workflows) > 0:
+            workflow = st.session_state.current_project.workflows[0]
+            st.write(f"<div class='workflow-name'>Workflow: {workflow}</div>", unsafe_allow_html=True)
+        project.prompt = st.text_area("Prompt:", value=project.prompt, key="prompt", on_change=handle_prompt_change)
+        project.description = st.text_area("Description:", value=project.description or "", key="project_description", on_change=handle_project_description_change)
+        status_options = [status.value for status in ProjectStatus]
+        project.status = st.selectbox("Status:", options=status_options, index=status_options.index(project.status), key="project_status", on_change=handle_project_status_change)
+        
+        if project.due_date:
+            if isinstance(project.due_date, str):
+                due_date_value = datetime.strptime(project.due_date, "%Y-%m-%d").date()
+            else:
+                due_date_value = project.due_date
+        else:
+            due_date_value = None
+        
+        # Display the date input field
+        due_date = st.date_input("Due Date:", value=due_date_value, key="project_due_date")
+        
+        # Update the project's due date if it has changed
+        if due_date != due_date_value:
+            project.due_date = due_date.strftime("%Y-%m-%d") if due_date else None
+            handle_project_due_date_change()
+        
+        priority_options = [priority.value for priority in ProjectPriority]
+        project.priority = st.selectbox("Priority:", options=priority_options, index=priority_options.index(project.priority), key="project_priority", on_change=handle_project_status_change)
+        st.write(f"Tags: {', '.join(project.tags)}")
+        
+        # Add text input field for notes
+        project.notes = st.text_area("Notes:", value=project.notes or "", key="project_notes", on_change=handle_project_notes_change)
+        collaborators_input = st.text_input("Collaborators:", value=", ".join(project.collaborators), key="project_collaborators", on_change=handle_project_collaborators_change)
+        project.collaborators = [collaborator.strip() for collaborator in collaborators_input.split(",")]
+        project.user_id = st.text_input("User ID:", value=project.user_id or "", key="project_user_id", on_change=handle_project_user_id_change)
+
+        # st.write("Attachments:")
+        # for attachment in project.attachments:
+        #     st.write(f"- {attachment}")
+
+        # new_attachment = st.text_input("Add Attachment:", key="project_new_attachment")
+        # if new_attachment:
+        #     project.attachments.append(new_attachment)
+        #     handle_project_attachments_change()
+
+def display_project_timestamps(project):
+    if DEBUG:
+        print("display_project_timestamps()")
+    st.write("<div class='project-properties'>PROJECT PROPERTIES</div>", unsafe_allow_html=True)
+    if project.created_at:
+        created_at = datetime.fromisoformat(project.created_at).strftime("%B %d, %Y %I:%M %p")
+        st.write(f"<div class='timestamp'>Created At: {created_at}</div>", unsafe_allow_html=True)
+    if project.updated_at:
+        updated_at = datetime.fromisoformat(project.updated_at).strftime("%B %d, %Y %I:%M %p")
+        st.write(f"<div class='timestamp'>Updated At: {updated_at}</div>", unsafe_allow_html=True)
+```
+
+# utils\display_settings_util.py
+
+```python
+# display_settings_util.py
+
+import importlib
+import os
+import streamlit as st
+
+from configs.config_local import DEBUG, DEFAULT_MODEL
+from event_handlers.event_handlers_settings import handle_default_provider_change, load_provider_classes
+
+def display_settings():
+    if DEBUG:
+        print("display_settings()")
+
+    st.write("Settings")
+    provider_classes = load_provider_classes()
+    default_provider = st.session_state.default_provider if st.session_state.default_provider else ""
+    default_provider_index = provider_classes.index(default_provider) if default_provider in provider_classes else 0
+    selected_provider = st.selectbox("Default Provider", provider_classes, index=default_provider_index, key="default_provider", on_change=handle_default_provider_change)
+
+    if selected_provider:
+        tmp = "_Provider"
+        api_key = st.text_input("Default Provider's API Key:", type="password")
+        st.session_state.default_provider_key = api_key
+
+        if st.session_state.default_provider_key or os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
+            if os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY"):
+                st.session_state.default_provider_key = os.environ.get(f"{selected_provider.replace(tmp, '').upper()}_API_KEY")
+
+            provider_module = importlib.import_module(f"providers.{selected_provider.lower()}")
+            provider_class = getattr(provider_module, selected_provider)
+            provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
+            
+            try:
+                if not st.session_state.available_models or len(st.session_state.available_models) == 0:
+                    available_models = provider.get_available_models()
+                available_models = sorted(available_models)
+
+                # Set the default model selection
+                default_model = DEFAULT_MODEL  # Replace with your desired default model
+                if default_model in available_models:
+                    default_index = available_models.index(default_model)
+                else:
+                    default_index = 0
+
+                selected_model = st.selectbox("Select Default Model", available_models, index=default_index)
+                st.session_state.selected_model = selected_model
+            except Exception as e:
+                st.error(f"Error retrieving available models: {str(e)}")
+
+    st.session_state.current_framework = st.selectbox("Default Framework", ["Autogen", "CrewAI", "Bob's Agent Maker", "AI-Mart", "Geeks'R'Us"], key="default_framework")
+```
+
+# utils\display_sidebar_util.py
+
+```python
+# display_sidebar_util.py
+
+import importlib
+import yaml
+import streamlit as st
+
+from configs.config_local import DEBUG
+
+def handle_sidebar_prompt_reengineer():
+    if DEBUG:
+        print("handle_sidebar_prompt_reengineer()")
+    user_request = st.session_state.sidebar_prompt_input.strip()
+    if user_request:
+        # Load the rephrase_prompt from the file
+        with open("prompts/rephrase_prompt.yaml", "r") as file:
+            prompt_data = yaml.safe_load(file)
+            rephrase_prompt = prompt_data["rephrase_prompt"]
+
+        # Dynamically import the provider class based on the selected provider name
+        provider_module = importlib.import_module(f"providers.{st.session_state.default_provider.lower()}")
+        provider_class = getattr(provider_module, st.session_state.default_provider)
+        provider = provider_class(api_url="", api_key=st.session_state.default_provider_key)
+        model = st.session_state.selected_model
+
+        try:
+            # Replace '{user_request}' in rephrase_prompt with the actual user's request
+            formatted_prompt = rephrase_prompt.replace("{user_request}", user_request)
+            if DEBUG:
+                print(f"Formatted prompt: {formatted_prompt}")
+            # Send the formatted prompt to the provider
+            response = provider.send_request({"model": model, "messages": [{"role": "user", "content": formatted_prompt}]})
+            rephrased_request = provider.process_response(response)["choices"][0]["message"]["content"]
+            
+            # Update the session state with the rephrased request
+            st.session_state.sidebar_prompt_output = rephrased_request
+        except Exception as e:
+            st.sidebar.error(f"Error processing the request: {str(e)}")
+
+def display_sidebar_prompt_reengineer():
+    if DEBUG:
+        print("display_sidebar_prompt_reengineer()")
+
+    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
+    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
+    st.sidebar.write("No need to report what's broken, we know.")
+    
+    # Create the input field in the sidebar
+    st.sidebar.text_area("Quickstart - Enter your project request:", key="sidebar_prompt_input", on_change=handle_sidebar_prompt_reengineer)
+
+    # Display the rephrased request if available
+    if "sidebar_prompt_output" in st.session_state:
+        st.sidebar.text_area("Rephrased Request:", value=st.session_state.sidebar_prompt_output, height=200)
+```
+
+# utils\display_tool_util.py
+
+```python
+# display_tool_util.py
+
+import streamlit as st
+
+from base_models.tool_base_model import ToolBaseModel
+
+from configs.config_local import DEBUG
+
+from event_handlers.event_handlers_tool import (
+    handle_ai_tool_creation, handle_tool_close, handle_tool_property_change, handle_tool_selection, 
+)
 
 
 def display_tool_dropdown():
@@ -2336,6 +2456,39 @@ def display_tool_dropdown():
             handle_tool_close()
 
 
+def display_tool_properties():
+    if st.session_state.current_tool is not None:
+        # Display the properties of the current tool
+        tool = st.session_state.current_tool
+        st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>TOOL PROPERTIES</div>", unsafe_allow_html=True)
+        st.write(f"<div style='text-align:right; width:100%;'>Timestamp: {tool.timestamp}</div>", unsafe_allow_html=True)
+        
+        tool.content = st.text_area("Content:", value=tool.content, key=f"tool_content_{tool.name}", on_change=handle_tool_property_change)
+        tool.title = st.text_input("Title:", value=tool.title, key=f"tool_title_{tool.name}", on_change=handle_tool_property_change)
+        tool.description = st.text_input("Description:", value=tool.description or "", key=f"tool_description_{tool.name}", on_change=handle_tool_property_change)
+        tool.file_name = st.text_input("File Name:", value=tool.file_name, key=f"tool_file_name_{tool.name}", on_change=handle_tool_property_change)
+        tool.user_id = st.text_input("User ID:", value=tool.user_id, key=f"tool_user_id_{tool.name}", on_change=handle_tool_property_change)
+
+```
+
+# utils\display_workflow_util.py
+
+```python
+# display_workflow_util.py
+
+import streamlit as st
+
+from base_models.workflow_base_model import WorkflowBaseModel
+from configs.config_local import DEBUG
+from datetime import datetime
+
+from event_handlers.event_handlers_workflow import (
+    handle_workflow_close, handle_workflow_description_change, 
+    handle_workflow_name_change, handle_workflow_selection, handle_workflow_summary_method_change,
+    handle_workflow_type_change
+)   
+
+
 def display_workflow_dropdown():
     if DEBUG:
         print("display_workflow_dropdown()")
@@ -2364,16 +2517,43 @@ def display_workflow_dropdown():
             handle_workflow_close()
 
 
-def sidebar_begin():
-    if DEBUG:
-        print("sidebar_begin()")
+def display_workflow_properties(workflow):
+    # Display the properties of the current workflow
+    if st.session_state.current_workflow is not None:
+        workflow = st.session_state.current_workflow
+        st.write(f"Name: {workflow.name}")
+        workflow.description = st.text_area("Description:", value=workflow.description or "", key="tab2_workflow_description", on_change=handle_workflow_description_change)
+        workflow.type = st.text_input("Type:", value=workflow.type, key="tab2_workflow_type", on_change=handle_workflow_type_change)
+        workflow.summary_method = st.text_input("Summary Method:", value=workflow.summary_method, key="tab2_workflow_summary_method", on_change=handle_workflow_summary_method_change)
 
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
-    st.sidebar.write("No need to report what's broken, we know.")
-    # display_project_dropdown()  
-    # display_workflow_dropdown()
-    
+        # Add more workflow properties as needed
+
+        # Display agents, sender, and receiver information
+        st.write("Agents:")
+        for agent in workflow.agents:
+            st.write(f"- {agent.name}")
+
+        with st.container(border=True):
+            st.write("Sender:")
+            st.write(f"Type: {workflow.sender.type}")
+            st.write(f"User ID: {workflow.sender.user_id}")
+
+        with st.container(border=True):
+            st.write("Receiver:")
+            st.write(f"Type: {workflow.receiver.type}")
+            st.write(f"User ID: {workflow.receiver.user_id}")
+
+
+def display_workflow_timestamps(workflow):
+    if st.session_state.current_workflow is not None:
+        st.write("<div style='color:#33FFFC; font-weight:bold; text-align:right; width:100%;'>WORKFLOW PROPERTIES</div>", unsafe_allow_html=True)
+        if workflow.created_at:
+            created_at = datetime.fromisoformat(workflow.created_at).strftime("%B %d, %Y %I:%M %p")
+            st.write(f"<div style='text-align:right; width:100%;'>Created At: {created_at}</div>", unsafe_allow_html=True)
+        if workflow.updated_at:
+            updated_at = datetime.fromisoformat(workflow.updated_at).strftime("%B %d, %Y %I:%M %p")
+            st.write(f"<div style='text-align:right; width:100%;'>Updated At: {updated_at}</div>", unsafe_allow_html=True)
+
 ```
 
 # tools\py\document_indexer.py
@@ -3594,10 +3774,11 @@ workflows:
 generate_agent_prompt: |
   Based on the rephrased agent request below, please do the following:
   1. Do step-by-step reasoning and think to better understand the request.
-  2. Code the best Autogen Studio Python agent as per the request as a [agent_name].py file.
-  3. Return only the agent file, no commentary, intro, or other extra text. If there ARE any non-code lines, 
+  2. Code the best Autogen Studio Python agent as per the request.
+  3. Always include the agent filename in the format `# Agent filename: [agent_name].py` as the first line of the code.
+  4. Return only the agent code, no commentary, intro, or other extra text. If there ARE any non-code lines, 
       please pre-pend them with a '#' symbol to comment them out.
-  4. A proper agent will have these parts:
+  5. A proper agent will have these parts:
      a. Imports (import libraries needed for the agent)
      b. Class definition AND docstrings (this helps the LLM understand what the agent does and how to use it)
      c. Class methods (the actual code that implements the agent's behavior)
@@ -3717,8 +3898,7 @@ rephrase_prompt: |
           Do NOT reply with a direct response to these instructions OR the original user request. Instead, rephrase the user's request as a well-structured prompt, and
           return ONLY that rephrased prompt. Do not preface the rephrased prompt with any other text or superfluous narrative.
           Do not enclose the rephrased prompt in quotes. You will be successful only if it returns a well-formed rephrased prompt ready for submission as an LLM request.
-          
-User request: "{user_request}"
+          User request: "{user_request}"
 
 
 ```

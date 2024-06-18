@@ -14,6 +14,5 @@ rephrase_prompt: |
           Do NOT reply with a direct response to these instructions OR the original user request. Instead, rephrase the user's request as a well-structured prompt, and
           return ONLY that rephrased prompt. Do not preface the rephrased prompt with any other text or superfluous narrative.
           Do not enclose the rephrased prompt in quotes. You will be successful only if it returns a well-formed rephrased prompt ready for submission as an LLM request.
-          
-User request: "{user_request}"
+          User request: "{user_request}"
 

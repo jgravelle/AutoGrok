@@ -17,7 +17,7 @@ class Openai_Provider(BaseLLMProvider):
     def get_available_models(self):
         if DEBUG:
             print ("GROQ: get_available_models")
-            print (f"KEY: {self.api_key}")
+            #print (f"KEY: {self.api_key}")
         response = requests.get("https://api.openai.com/v1/models", headers={
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
