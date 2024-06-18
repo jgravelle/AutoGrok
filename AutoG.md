@@ -508,6 +508,7 @@ class ToolBaseModel:
 # workflow_base_model
 
 import os
+import streamlit as st
 import yaml
 
 from base_models.agent_base_model import AgentBaseModel
@@ -599,8 +600,8 @@ class WorkflowBaseModel:
         name: str = "",
         description: str = "",
         agents: List[AgentBaseModel] = [],
-        sender: Sender = Sender,
-        receiver: Receiver = Receiver,
+        sender: Sender = None,
+        receiver: Receiver = None,
         type: str = "twoagents",
         user_id: str = "user",
         timestamp: str = datetime.now().isoformat(),
@@ -615,16 +616,30 @@ class WorkflowBaseModel:
         self.name = name or "New Workflow"
         self.description = description or "This workflow is used for general purpose tasks."
         self.agents = agents or []
-        self.sender = sender or Sender
-        self.receiver = receiver or Receiver
+        self.sender = sender or Sender(
+            type="userproxy",
+            config={},
+            timestamp=datetime.now().isoformat(),
+            user_id="user",
+            tools=[],
+        )
+        self.receiver = receiver or Receiver(
+            type="assistant",
+            config={},
+            groupchat_config={},
+            timestamp=datetime.now().isoformat(),
+            user_id="default",
+            tools=[],
+            agents=[],
+        )
         self.type = type or "twoagents"
         self.user_id = user_id or "user"
         self.timestamp = timestamp or datetime.now().isoformat()
         self.summary_method = summary_method or "last"
-        self.settings = settings or {} # Settings for the workflow
-        self.groupchat_config = groupchat_config or {} # Group chat configuration
-        self.created_at = created_at or datetime.now().isoformat() # Created at timestamp
-        self.updated_at = updated_at # Updated at timestamp
+        self.settings = settings or {}
+        self.groupchat_config = groupchat_config or {}
+        self.created_at = created_at or datetime.now().isoformat()
+        self.updated_at = updated_at
 
     def to_dict(self):
         return {
@@ -648,9 +663,12 @@ class WorkflowBaseModel:
     def create_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Creating workflow {workflow_name}")
+
+        current_timestamp = datetime.now().isoformat()
+
         workflow = cls(
             name=workflow_name,
-            description="This workflow is used for general purpose tasks.",
+            description=st.session_state.current_project.prompt if st.session_state.current_project else "This workflow is used for general purpose tasks.",
             agents=[],
             sender=Sender(
                 type="userproxy",
@@ -660,12 +678,12 @@ class WorkflowBaseModel:
                         "config_list": [
                             {
                                 "user_id": "default",
-                                "timestamp": "2024-03-28T06:34:40.214593",
-                                "model": "gpt-4o",
+                                "timestamp": current_timestamp,
+                                "model": st.session_state.selected_model,
                                 "base_url": None,
                                 "api_type": None,
                                 "api_version": None,
-                                "description": "OpenAI model configuration"
+                                "description": f"{st.session_state.default_provider} model configuration"
                             }
                         ],
                         "temperature": 0.1,
@@ -685,15 +703,15 @@ class WorkflowBaseModel:
                     "default_auto_reply": "TERMINATE",
                     "description": "A user proxy agent that executes code."
                 },
-                timestamp="2024-03-28T06:34:40.214593",
-                user_id="user",
-                tools=[
+                timestamp=current_timestamp,
+                user_id=st.session_state.current_project.user_id if st.session_state.current_project else "user",
+                tools=st.session_state.current_project.tools if st.session_state.current_project else [
                     {
                         "title": "fetch_web_content",
                         "content": "...",  # Omitted for brevity
                         "file_name": "fetch_web_content.json",
                         "description": None,
-                        "timestamp": "2024-05-14T08:19:12.425322",
+                        "timestamp": current_timestamp,
                         "user_id": "default"
                     }
                 ]
@@ -706,12 +724,12 @@ class WorkflowBaseModel:
                         "config_list": [
                             {
                                 "user_id": "default",
-                                "timestamp": "2024-05-14T08:19:12.425322",
-                                "model": "gpt-4o",
+                                "timestamp": current_timestamp,
+                                "model": st.session_state.selected_model,
                                 "base_url": None,
                                 "api_type": None,
                                 "api_version": None,
-                                "description": "OpenAI model configuration"
+                                "description": f"{st.session_state.default_provider} model configuration"
                             }
                         ],
                         "temperature": 0.1,
@@ -726,26 +744,26 @@ class WorkflowBaseModel:
                     "is_termination_msg": None,
                     "code_execution_config": None,
                     "default_auto_reply": "",
-                    "description": "A primary assistant agent that writes plans and code to solve tasks. booger"
+                    "description": "A primary assistant agent that writes plans and code to solve tasks."
                 },
                 groupchat_config={},
-                timestamp=datetime.now().isoformat(),
-                user_id="default",
-                tools=[
+                timestamp=current_timestamp,
+                user_id=st.session_state.current_project.user_id if st.session_state.current_project else "default",
+                tools=st.session_state.current_project.tools if st.session_state.current_project else [
                     {
                         "title": "fetch_web_content",
                         "content": "...",  # Omitted for brevity
                         "file_name": "fetch_web_content.json",
                         "description": None,
-                        "timestamp": "2024-05-14T08:19:12.425322",
+                        "timestamp": current_timestamp,
                         "user_id": "default"
                     }
                 ],
                 agents=[]
             ),
             type="twoagents",
-            user_id="user",
-            timestamp=datetime.now().isoformat(),
+            user_id=st.session_state.current_project.user_id if st.session_state.current_project else "user",
+            timestamp=current_timestamp,
             summary_method="last"
         )
 
@@ -755,6 +773,7 @@ class WorkflowBaseModel:
             yaml.dump(workflow_data, file)
 
         return workflow
+
     
     @classmethod
     def from_dict(cls, data: Dict):
@@ -2446,7 +2465,7 @@ def handle_sidebar_prompt_reengineer():
         st.session_state.current_project.set_prompt(result_text)
         st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
         st.session_state.current_workflow.create_workflow("New Workflow")
-        st.session_state.current_workflow.set_description(user_request)
+        st.session_state.current_workflow.set_description(user_request + "\n\r" + result_text)
 
         update_project()
         update_workflow()
@@ -3791,7 +3810,7 @@ skills:
 ```yaml
 attachments: []
 collaborators: []
-created_at: '2024-06-18T11:08:39.605429'
+created_at: '2024-06-18T11:47:33.867291'
 deliverables: []
 description: null
 due_date: null
@@ -3799,21 +3818,20 @@ id: 1
 name: New Project
 notes: null
 priority: none
-prompt: "Design a digital calculator that accurately performs mathematical operations,\
-  \ including addition, subtraction, multiplication, and division, with the ability\
-  \ to handle decimal points and negative numbers. Consider the user's experience\
-  \ by incorporating an intuitive interface, clear numerical displays, and a history\
-  \ of previous calculations. Provide a sample calculation scenario to demonstrate\
-  \ the calculator's capabilities. Consider the following constraints: \n\n* The calculator\
-  \ must be able to handle at least two decimal places.\n* The user should be able\
-  \ to easily switch between basic arithmetic operations.\n* Include a \"Clear\" button\
-  \ to reset the calculator for new calculations.\n* Incorporate a \"history\" feature\
-  \ to display the previous calculations.\n* Ensure the calculator is user-friendly\
-  \ and visually appealing.\n* Provide an example calculation: 5.25 + 2.8 = ?"
+prompt: "Author an original novel of approximately 70,000 words, set in a fictional\
+  \ world with a unique magical system. \n\nImaginary realms are woven together by\
+  \ a mystical fabric, which is fed by the collective dreams of the sleeping population.\
+  \ \n\nIn a world where lucid dreaming is a product of mental discipline, an elite\
+  \ group of \"Weavers\" maintain the balance of these subconscious energies. \n\n\
+  The story follows Arden, a talented yet rebellious Weaver, who discovers a hidden\
+  \ dimension within the dream realm. \n\nWith this newfound power, Arden must navigate\
+  \ treacherous alliances and ancient conspiracies to unravel the dark secrets behind\
+  \ their world's fragile equilibrium.\n\nThe novel should showcase vivid descriptions\
+  \ of the dreamscapes, intricate plot twists, and complex characters."
 status: not started
 tags: []
 tools: []
-updated_at: '2024-06-18T11:08:39.614366'
+updated_at: '2024-06-18T11:47:33.877214'
 user_id: user
 workflows: []
 
@@ -4005,89 +4023,39 @@ user_id: default
 
 ```yaml
 agents: []
-created_at: '2024-06-18T11:08:39.608369'
-description: This workflow is used for general purpose tasks.
+created_at: '2024-06-18T11:47:33.871217'
+description: "Write a book\n\rAuthor an original novel of approximately 70,000 words,\
+  \ set in a fictional world with a unique magical system. \n\nImaginary realms are\
+  \ woven together by a mystical fabric, which is fed by the collective dreams of\
+  \ the sleeping population. \n\nIn a world where lucid dreaming is a product of mental\
+  \ discipline, an elite group of \"Weavers\" maintain the balance of these subconscious\
+  \ energies. \n\nThe story follows Arden, a talented yet rebellious Weaver, who discovers\
+  \ a hidden dimension within the dream realm. \n\nWith this newfound power, Arden\
+  \ must navigate treacherous alliances and ancient conspiracies to unravel the dark\
+  \ secrets behind their world's fragile equilibrium.\n\nThe novel should showcase\
+  \ vivid descriptions of the dreamscapes, intricate plot twists, and complex characters."
 groupchat_config: {}
 id: 1
 name: New Workflow
 receiver:
   agents: []
-  config:
-    code_execution_config: null
-    default_auto_reply: ''
-    description: A primary assistant agent that writes plans and code to solve tasks.
-      booger
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-05-14T08:19:12.425322'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: primary_assistant
-    system_message: '...'
+  config: {}
   groupchat_config: {}
-  timestamp: '2024-06-18T11:08:39.608369'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
+  timestamp: '2024-06-18T11:47:33.871217'
+  tools: []
   type: assistant
   user_id: default
 sender:
-  config:
-    code_execution_config:
-      use_docker: false
-      work_dir: null
-    default_auto_reply: TERMINATE
-    description: A user proxy agent that executes code.
-    human_input_mode: NEVER
-    is_termination_msg: null
-    llm_config:
-      cache_seed: null
-      config_list:
-      - api_type: null
-        api_version: null
-        base_url: null
-        description: OpenAI model configuration
-        model: gpt-4o
-        timestamp: '2024-03-28T06:34:40.214593'
-        user_id: default
-      extra_body: null
-      max_tokens: null
-      temperature: 0.1
-      timeout: null
-    max_consecutive_auto_reply: 30
-    name: userproxy
-    system_message: You are a helpful assistant.
-  timestamp: '2024-03-28T06:34:40.214593'
-  tools:
-  - content: '...'
-    description: null
-    file_name: fetch_web_content.json
-    timestamp: '2024-05-14T08:19:12.425322'
-    title: fetch_web_content
-    user_id: default
+  config: {}
+  timestamp: '2024-06-18T11:47:33.871217'
+  tools: []
   type: userproxy
   user_id: user
 settings: {}
 summary_method: last
-timestamp: '2024-06-18T11:08:39.608369'
+timestamp: '2024-06-18T11:47:23.665482'
 type: twoagents
-updated_at: null
+updated_at: '2024-06-18T11:47:33.878221'
 user_id: user
 
 ```
