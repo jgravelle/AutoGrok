@@ -2401,6 +2401,7 @@ def display_settings():
 
 import streamlit as st
 
+from base_models.project_base_model import ProjectBaseModel
 from configs.config_local import DEBUG
 from event_handlers.event_handlers_prompt import handle_prompt
 
@@ -2408,9 +2409,11 @@ from event_handlers.event_handlers_prompt import handle_prompt
 def display_sidebar_message():
     if DEBUG:
         print("display_sidebar_message()")
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> Universal AI Agents Made Easy. <br/> Eventually.</div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("(We're putting the 'mental' in 'experimental'.)")
-    st.sidebar.write("No need to report what's broken, we know.")
+    st.sidebar.write("<div class='teeny'>Need agents right frickin' now? : <a href='https://autogroq.streamlit.app/'>https://autogroq.streamlit.app/</a></div><p/>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='title'>AutoGrok™ <br/> </div>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='teeny'>Universal AI Agents Made Easy. <br/> Theoretically.</div><p/>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='teeny'>We're putting the 'mental' in 'experimental'.</div>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='teeny'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)
 
 
 def display_sidebar_prompt_reengineer():
@@ -2431,6 +2434,11 @@ def handle_sidebar_prompt_reengineer():
     result_text = handle_prompt(user_request, "prompts/rephrase_prompt.yaml", "rephrase_prompt")
     if result_text:
         st.session_state.sidebar_prompt_output = result_text
+        # Create new Project named "New Project" with the rephrased request as the 'prompt' property value
+        st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
+        st.session_state.current_project.create_project("New Project")
+        st.session_state.current_project.set_prompt(result_text)
+
 ```
 
 # utils\display_tool_util.py
@@ -3763,6 +3771,51 @@ skills:
     description: null
     timestamp: ""
     user_id: default
+
+```
+
+# projects\New Project.yaml
+
+```yaml
+attachments: []
+collaborators:
+- ''
+created_at: '2024-06-18T10:10:37.567064'
+deliverables: []
+description: ''
+due_date: null
+id: 1
+name: New Project
+notes: ''
+priority: none
+prompt: 'Design an intuitive mobile application for tracking and analyzing stock market
+  performance, incorporating features for users to:
+
+
+  * Monitor real-time stock prices and trends
+
+  * Set personalized watchlists for easy tracking
+
+  * Receive notifications for price movements and market events
+
+  * Access historical data for informed investment decisions
+
+  * Visualize stock performance with interactive charts and graphs
+
+  * Integrate with financial news sources for comprehensive insights
+
+
+  Please generate a user-friendly interface, including at least three main screens:
+  Home, Portfolio, and News. The app should be responsive, with a clean design that
+  adapts to various device screen sizes. Consider implementing a feature to recommend
+  stocks based on market trends and user portfolio performance.'
+status: not started
+tags: []
+tools: []
+updated_at: '2024-06-18T10:11:01.235246'
+user_id: user
+workflows:
+- Workflow1
 
 ```
 

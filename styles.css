@@ -7,6 +7,12 @@
     width: 100%;
 }
 
+.teeny {
+    font-size: 0.75em;
+    text-align: center;
+    width: 100%;
+}
+
 .timestamp {
     text-align: right;
     width: 100%;
@@ -14,7 +20,7 @@
 
 .title {
     color: #33FFFC;
-    font-size: 1.5em;
+    font-size: 1.25em;
     font-weight: bold;
     text-align: center;
     width: 100%;

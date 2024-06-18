@@ -1,0 +1,39 @@
+attachments: []
+collaborators:
+- ''
+created_at: '2024-06-18T10:10:37.567064'
+deliverables: []
+description: ''
+due_date: null
+id: 1
+name: New Project
+notes: ''
+priority: none
+prompt: 'Design an intuitive mobile application for tracking and analyzing stock market
+  performance, incorporating features for users to:
+
+
+  * Monitor real-time stock prices and trends
+
+  * Set personalized watchlists for easy tracking
+
+  * Receive notifications for price movements and market events
+
+  * Access historical data for informed investment decisions
+
+  * Visualize stock performance with interactive charts and graphs
+
+  * Integrate with financial news sources for comprehensive insights
+
+
+  Please generate a user-friendly interface, including at least three main screens:
+  Home, Portfolio, and News. The app should be responsive, with a clean design that
+  adapts to various device screen sizes. Consider implementing a feature to recommend
+  stocks based on market trends and user portfolio performance.'
+status: not started
+tags: []
+tools: []
+updated_at: '2024-06-18T10:11:01.235246'
+user_id: user
+workflows:
+- Workflow1
