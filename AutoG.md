@@ -1172,7 +1172,14 @@ def handle_project_name_change():
         print("called handle_project_name_change()")
     new_project_name = st.session_state.project_name_edit.strip()
     if new_project_name:
+        old_project_name = st.session_state.current_project.name
         st.session_state.current_project.name = new_project_name
+        
+        # Rename the project file
+        old_file_path = f"projects/{old_project_name}.yaml"
+        new_file_path = f"projects/{new_project_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+        
         update_project()
 
 
@@ -1549,13 +1556,19 @@ def handle_workflow_name_change():
     if new_workflow_name:
         old_workflow_name = st.session_state.current_workflow.name
         st.session_state.current_workflow.name = new_workflow_name
-        update_workflow()
+        
+        # Rename the workflow file
+        old_file_path = f"workflows/{old_workflow_name}.yaml"
+        new_file_path = f"workflows/{new_workflow_name}.yaml"
+        os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
         if st.session_state.current_project and old_workflow_name in st.session_state.current_project.workflows:
             index = st.session_state.current_project.workflows.index(old_workflow_name)
             st.session_state.current_project.workflows[index] = new_workflow_name
             update_project()
+        
+        update_workflow()
 
 
 def handle_workflow_selection():
@@ -2239,7 +2252,8 @@ def display_files():
     selected_folder = st.selectbox("Select a folder", folders)
 
     # Get the list of files in the selected folder
-    files = os.listdir(selected_folder)
+    items = os.listdir(selected_folder)
+    files = [item for item in items if os.path.isfile(os.path.join(selected_folder, item))]
 
     if files:
         # Create a selectbox to choose the file
@@ -2252,7 +2266,7 @@ def display_files():
         st.text_area("File content", file_content, height=400)
 
         # Add a button to save changes to the file
-        if st.button("Save changes"):
+        if st.button("Save changes"):   
             with open(file_path, 'w') as file:
                 file.write(st.session_state.file_content)
             st.success("File saved successfully.")
@@ -3902,29 +3916,6 @@ skills:
 
 ```
 
-# projects\Test.yaml
-
-```yaml
-attachments: []
-collaborators: []
-created_at: '2024-06-19T09:21:46.541948'
-deliverables: []
-description: null
-due_date: null
-id: 1
-name: Test
-notes: null
-priority: none
-prompt: ''
-status: not started
-tags: []
-tools: []
-updated_at: null
-user_id: user
-workflows: []
-
-```
-
 # prompts\generate_agent_prompt.yaml
 
 ```yaml
@@ -4077,6 +4068,51 @@ name: find_anagram
 timestamp: '2024-06-14T15:58:21.264031'
 title: find_anagram
 user_id: default
+
+```
+
+# workflows\New Workflowz.yaml
+
+```yaml
+agents: []
+created_at: '2024-06-19T09:31:28.922689'
+description: "Make a small business accounting system\n\rHere is the rephrased prompt:\n\
+  \nDesign a basic accounting system for a small business, incorporating the following\
+  \ features:\n\nTrack income and expenses for a hypothetical company, 'ABC Inc.'\n\
+  \nCreate separate accounts for:\nRevenues (e.g. sales, services, investments)\n\n\
+  Expenses (e.g. payroll, rent, supplies, utilities)\n\nAssets (e.g. cash, inventory,\
+  \ equipment)\n\nLiabilities (e.g. debts, loans, credit cards)\n\nProvide examples\
+  \ for the following:\n\nIncome Statement: Calculate revenue and net income for Q1-Q4\n\
+  Balance Sheet: Report asset, liability, and equity values for the same period\n\n\
+  Include an example of how to handle journal entries for expenses, sales tax, and\
+  \ depreciation.\n\nConsider a scenario where the business experiences fluctuations\
+  \ in cash flow and provide suggestions for managing these changes.\n\nEnsure scalability\
+  \ for 2-3 additional employees and account types.\n\nHow would you modify the system\
+  \ to account for changes in government regulations, industry standards, or new tax\
+  \ laws?"
+groupchat_config: {}
+id: 1
+name: New Workflowz
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-19T09:31:28.922689'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-19T09:31:28.922689'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-19T09:14:19.212078'
+type: twoagents
+updated_at: '2024-06-19T12:51:20.545935'
+user_id: user
 
 ```
 
