@@ -20,7 +20,8 @@ def display_files():
     selected_folder = st.selectbox("Select a folder", folders)
 
     # Get the list of files in the selected folder
-    files = os.listdir(selected_folder)
+    items = os.listdir(selected_folder)
+    files = [item for item in items if os.path.isfile(os.path.join(selected_folder, item))]
 
     if files:
         # Create a selectbox to choose the file
@@ -33,7 +34,7 @@ def display_files():
         st.text_area("File content", file_content, height=400)
 
         # Add a button to save changes to the file
-        if st.button("Save changes"):
+        if st.button("Save changes"):   
             with open(file_path, 'w') as file:
                 file.write(st.session_state.file_content)
             st.success("File saved successfully.")
