@@ -8,7 +8,7 @@ from base_models.project_base_model import (
 from configs.config_local import DEBUG
 from datetime import datetime
 from event_handlers.event_handlers_project import (
-    handle_project_collaborators_change, handle_project_close, 
+    handle_project_collaborators_change, handle_project_close, handle_project_delete,
     handle_project_description_change, handle_project_due_date_change, 
     handle_project_name_change, handle_project_notes_change, 
     handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
@@ -44,6 +44,7 @@ def display_project_dropdown():
         )
         if st.button("CLOSE THIS PROJECT"):
             handle_project_close()
+
 
 
 def display_project_properties(project):

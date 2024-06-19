@@ -9,6 +9,7 @@ from utils.display_main_util import sidebar_begin, display_main
 
 def main():
     st.set_page_config(page_title="AutoGrok™")
+
     initialize_session_variables()
     sidebar_begin()
     

@@ -1,4 +1,4 @@
-# event_handlers.py
+# event_handlers_project.py
 
 import os
 import streamlit as st
@@ -44,20 +44,6 @@ def handle_project_close():
 def handle_project_delete():
     if DEBUG:
         print("handle_project_delete()")
-    project_name = st.session_state.current_project.name
-    project_file = f"projects/{project_name}.yaml"
-    
-    if os.path.exists(project_file):
-        if st.sidebar.button(f"Delete Project '{project_name}'", key=f"delete_project_{project_name}"):
-            st.sidebar.warning(f"Are you sure you want to delete the project '{project_name}'?")
-            if st.sidebar.button("Confirm Delete", key=f"confirm_delete_project_{project_name}"):
-                os.remove(project_file)
-                st.session_state.current_project = None
-                st.session_state.project_dropdown = "Select..."
-                st.success(f"Project '{project_name}' has been deleted.")
-                st.rerun()
-    else:
-        st.error(f"Project file '{project_file}' not found.")
 
 
 def handle_project_description_change():

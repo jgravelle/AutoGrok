@@ -4,8 +4,9 @@ import streamlit as st
 
 from configs.config_local import DEBUG
 
-from utils.display_debug_util import display_debug
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
+from utils.display_debug_util import display_debug
+from utils.display_files_util import display_files
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
 from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
@@ -20,7 +21,7 @@ def display_main():
     with open("styles.css") as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     
-    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug"])
+    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management"])
 
 #   PROJECTS
     with projectTab:
@@ -63,6 +64,9 @@ def display_main():
 
     with debugTab:
         display_debug()
+    
+    with filesTab:
+        display_files()
 
 
 #   SIDEBAR

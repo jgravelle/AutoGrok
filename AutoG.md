@@ -12,6 +12,7 @@ from utils.display_main_util import sidebar_begin, display_main
 
 def main():
     st.set_page_config(page_title="AutoGrok™")
+
     initialize_session_variables()
     sidebar_begin()
     
@@ -1086,10 +1087,21 @@ def update_agent():
         yaml.dump(agent_data, file)
 ```
 
+# event_handlers\event_handlers_files.py
+
+```python
+# event_handlers_files.py
+
+from configs.config_local import DEBUG
+
+
+
+```
+
 # event_handlers\event_handlers_project.py
 
 ```python
-# event_handlers.py
+# event_handlers_project.py
 
 import os
 import streamlit as st
@@ -1135,20 +1147,6 @@ def handle_project_close():
 def handle_project_delete():
     if DEBUG:
         print("handle_project_delete()")
-    project_name = st.session_state.current_project.name
-    project_file = f"projects/{project_name}.yaml"
-    
-    if os.path.exists(project_file):
-        if st.sidebar.button(f"Delete Project '{project_name}'", key=f"delete_project_{project_name}"):
-            st.sidebar.warning(f"Are you sure you want to delete the project '{project_name}'?")
-            if st.sidebar.button("Confirm Delete", key=f"confirm_delete_project_{project_name}"):
-                os.remove(project_file)
-                st.session_state.current_project = None
-                st.session_state.project_dropdown = "Select..."
-                st.success(f"Project '{project_name}' has been deleted.")
-                st.rerun()
-    else:
-        st.error(f"Project file '{project_file}' not found.")
 
 
 def handle_project_description_change():
@@ -2216,6 +2214,57 @@ def display_debug():
                     st.write(f"```\n{value}\n```")
 ```
 
+# utils\display_files_util.py
+
+```python
+# display_files_util.py
+
+import os
+import streamlit as st
+
+from configs.config_local import DEBUG
+
+
+import os
+import streamlit as st
+
+def display_files():
+    if DEBUG:
+        print("display_files()")
+
+    # Define the folders to display
+    folders = ['agents', 'projects', 'tools', 'workflows']
+
+    # Create a selectbox to choose the folder
+    selected_folder = st.selectbox("Select a folder", folders)
+
+    # Get the list of files in the selected folder
+    files = os.listdir(selected_folder)
+
+    if files:
+        # Create a selectbox to choose the file
+        selected_file = st.selectbox("Select a file", files)
+
+        # Display the content of the selected file
+        file_path = os.path.join(selected_folder, selected_file)
+        with open(file_path, 'r') as file:
+            file_content = file.read()
+        st.text_area("File content", file_content, height=400)
+
+        # Add a button to save changes to the file
+        if st.button("Save changes"):
+            with open(file_path, 'w') as file:
+                file.write(st.session_state.file_content)
+            st.success("File saved successfully.")
+
+        # Add a button to delete the file
+        if st.button("Delete file"):
+            os.remove(file_path)
+            st.success("File deleted successfully.")
+    else:
+        st.warning(f"No files found in the '{selected_folder}' folder.")
+```
+
 # utils\display_main_util.py
 
 ```python
@@ -2225,8 +2274,9 @@ import streamlit as st
 
 from configs.config_local import DEBUG
 
-from utils.display_debug_util import display_debug
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
+from utils.display_debug_util import display_debug
+from utils.display_files_util import display_files
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
 from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
@@ -2241,7 +2291,7 @@ def display_main():
     with open("styles.css") as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     
-    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug"])
+    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management"])
 
 #   PROJECTS
     with projectTab:
@@ -2284,6 +2334,9 @@ def display_main():
 
     with debugTab:
         display_debug()
+    
+    with filesTab:
+        display_files()
 
 
 #   SIDEBAR
@@ -2305,7 +2358,7 @@ from base_models.project_base_model import (
 from configs.config_local import DEBUG
 from datetime import datetime
 from event_handlers.event_handlers_project import (
-    handle_project_collaborators_change, handle_project_close, 
+    handle_project_collaborators_change, handle_project_close, handle_project_delete,
     handle_project_description_change, handle_project_due_date_change, 
     handle_project_name_change, handle_project_notes_change, 
     handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
@@ -2341,6 +2394,7 @@ def display_project_dropdown():
         )
         if st.button("CLOSE THIS PROJECT"):
             handle_project_close()
+
 
 
 def display_project_properties(project):
@@ -3766,28 +3820,6 @@ def save_webpage_as_text(url, output_filename):
 # #         print(title, link, snippet)
 ```
 
-# agents\Accountant.yaml
-
-```yaml
-code: "# Agent filename: Accountant.py\nimport logging\n\nclass Accountant:\n    \"\
-  \"\"\n        An accountant that performs accounting tasks based on the given request.\n\
-  \        Methods:\n        process_transaction(args): Processes a transaction as\
-  \ per the request.\n    \"\"\"\n    def __init__(self):\n        \"\"\"\n      \
-  \  Initializes the Accountant.\n        \"\"\"\n        self.logger = logging.getLogger(__name__)\n\
-  \n    def process_transaction(self, transaction_data):\n        \"\"\"\n       \
-  \ Processes a transaction based on the given data.\n        Parameters:\n      \
-  \  transaction_data (dict): Contains the transaction details.\n        \"\"\"\n\
-  \        self.logger.info('Processing transaction: {}'.format(transaction_data))\n\
-  \        # Implement transaction processing logic here\n        pass\n    # Example\
-  \ usage:\n    # accountant = Accountant()\n    # accountant.process_transaction({'amount':\
-  \ 100, 'type': 'deposit'})"
-config:
-  name: Accountant
-name: Accountant
-skills: []
-
-```
-
 # agents\primary_assistant.yaml
 
 ```yaml
@@ -3870,31 +3902,26 @@ skills:
 
 ```
 
-# agents\toadie.yaml
+# projects\Test.yaml
 
 ```yaml
-code: "# Agent filename: toadie.py\nimport datetime\nimport random\n\nclass Toadie:\n\
-  \    \"\"\"\n    A general office helper. Toadie.\n    Methods:\n    greet(name):\
-  \ Greets with a friendly message.\n    schedule(name): Schedules a meeting with\
-  \ a random time.\n    order_tea(): Orders tea.\n    \"\"\"\n    def __init__(self):\n\
-  \        \"\"\"\n        Initializes the Toadie.\n        \"\"\"\n        pass\n\
-  \n    def greet(self, name):\n        \"\"\"\n        Greets with a friendly message.\n\
-  \        Parameters:\n        name (str): The name of the person to greet.\n   \
-  \     Returns:\n        str: The greeting message.\n        \"\"\"\n        return\
-  \ f\"Hello, {name}! Today is {datetime.date.today()}.\"\n\n    def schedule(self,\
-  \ name):\n        \"\"\"\n        Schedules a meeting with a random time.\n    \
-  \    Parameters:\n        name (str): The name of the person who is scheduling the\
-  \ meeting.\n        Returns:\n        str: The meeting schedule.\n        \"\"\"\
-  \n        time = datetime.time(random.randint(9, 17), random.randint(0, 59))\n \
-  \       return f\"Your meeting with {name} is scheduled for {time} today.\"\n\n\
-  \    def order_tea(self):\n        \"\"\"\n        Orders tea.\n        \"\"\"\n\
-  \        return \"Tea ordered!\"\n\n    # Example usage:\n    # agent = Toadie()\n\
-  \    # name = \"John\"\n    # print(agent.greet(name))\n    # print(agent.schedule(name))\n\
-  \    # print(agent.order_tea())"
-config:
-  name: toadie
-name: toadie
-skills: []
+attachments: []
+collaborators: []
+created_at: '2024-06-19T09:21:46.541948'
+deliverables: []
+description: null
+due_date: null
+id: 1
+name: Test
+notes: null
+priority: none
+prompt: ''
+status: not started
+tags: []
+tools: []
+updated_at: null
+user_id: user
+workflows: []
 
 ```
 
@@ -4050,96 +4077,6 @@ name: find_anagram
 timestamp: '2024-06-14T15:58:21.264031'
 title: find_anagram
 user_id: default
-
-```
-
-# workflows\Accounting Workflow.yaml
-
-```yaml
-agents: []
-created_at: '2024-06-18T15:19:27.051419'
-description: "Create a small business online accounting application\n\rDevelop a comprehensive\
-  \ online accounting application for small businesses, featuring a user-friendly\
-  \ interface and robust features to streamline financial management, including:\n\
-  \n* Automated invoicing and payment tracking\n* Accurate expense categorization\
-  \ and reporting\n* Real-time budgeting and cash flow monitoring\n* Secure access\
-  \ and data backup capabilities\n* Multi-user support for accountants and administrators\n\
-  \nExample functional requirements include:\n\n* Accurately calculate and display\
-  \ profit margins, revenue, and net income\n* Enable financial reporting and analysis\
-  \ with customizable dashboards\n* Integrate with existing accounting software (e.g.,\
-  \ QuickBooks) for seamless data import/export\n* Implement security measures, such\
-  \ as password protection and two-factor authentication, to ensure data confidentiality\n\
-  \nPlease design and outline the core features, architecture, and user interface\
-  \ of this online accounting application, considering scalability, maintainability,\
-  \ and user adoption."
-groupchat_config: {}
-id: 1
-name: Accounting Workflow
-receiver:
-  agents: []
-  config: {}
-  groupchat_config: {}
-  timestamp: '2024-06-18T15:19:27.051419'
-  tools: []
-  type: assistant
-  user_id: default
-sender:
-  config: {}
-  timestamp: '2024-06-18T15:19:27.051419'
-  tools: []
-  type: userproxy
-  user_id: user
-settings: {}
-summary_method: last
-timestamp: '2024-06-18T15:08:11.026067'
-type: twoagents
-updated_at: '2024-06-18T15:20:00.311931'
-user_id: user
-
-```
-
-# workflows\New Workflow.yaml
-
-```yaml
-agents: []
-created_at: '2024-06-18T15:19:27.051419'
-description: "Create a small business online accounting application\n\rDevelop a comprehensive\
-  \ online accounting application for small businesses, featuring a user-friendly\
-  \ interface and robust features to streamline financial management, including:\n\
-  \n* Automated invoicing and payment tracking\n* Accurate expense categorization\
-  \ and reporting\n* Real-time budgeting and cash flow monitoring\n* Secure access\
-  \ and data backup capabilities\n* Multi-user support for accountants and administrators\n\
-  \nExample functional requirements include:\n\n* Accurately calculate and display\
-  \ profit margins, revenue, and net income\n* Enable financial reporting and analysis\
-  \ with customizable dashboards\n* Integrate with existing accounting software (e.g.,\
-  \ QuickBooks) for seamless data import/export\n* Implement security measures, such\
-  \ as password protection and two-factor authentication, to ensure data confidentiality\n\
-  \nPlease design and outline the core features, architecture, and user interface\
-  \ of this online accounting application, considering scalability, maintainability,\
-  \ and user adoption."
-groupchat_config: {}
-id: 1
-name: New Workflow
-receiver:
-  agents: []
-  config: {}
-  groupchat_config: {}
-  timestamp: '2024-06-18T15:19:27.051419'
-  tools: []
-  type: assistant
-  user_id: default
-sender:
-  config: {}
-  timestamp: '2024-06-18T15:19:27.051419'
-  tools: []
-  type: userproxy
-  user_id: user
-settings: {}
-summary_method: last
-timestamp: '2024-06-18T15:08:11.026067'
-type: twoagents
-updated_at: '2024-06-18T15:19:27.056459'
-user_id: user
 
 ```
 
