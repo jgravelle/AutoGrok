@@ -1,0 +1,39 @@
+agents: []
+created_at: '2024-06-19T09:31:28.922689'
+description: "Make a small business accounting system\n\rHere is the rephrased prompt:\n\
+  \nDesign a basic accounting system for a small business, incorporating the following\
+  \ features:\n\nTrack income and expenses for a hypothetical company, 'ABC Inc.'\n\
+  \nCreate separate accounts for:\nRevenues (e.g. sales, services, investments)\n\n\
+  Expenses (e.g. payroll, rent, supplies, utilities)\n\nAssets (e.g. cash, inventory,\
+  \ equipment)\n\nLiabilities (e.g. debts, loans, credit cards)\n\nProvide examples\
+  \ for the following:\n\nIncome Statement: Calculate revenue and net income for Q1-Q4\n\
+  Balance Sheet: Report asset, liability, and equity values for the same period\n\n\
+  Include an example of how to handle journal entries for expenses, sales tax, and\
+  \ depreciation.\n\nConsider a scenario where the business experiences fluctuations\
+  \ in cash flow and provide suggestions for managing these changes.\n\nEnsure scalability\
+  \ for 2-3 additional employees and account types.\n\nHow would you modify the system\
+  \ to account for changes in government regulations, industry standards, or new tax\
+  \ laws?"
+groupchat_config: {}
+id: 1
+name: New Workflowz
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-19T09:31:28.922689'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-19T09:31:28.922689'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-19T09:14:19.212078'
+type: twoagents
+updated_at: '2024-06-19T12:51:20.545935'
+user_id: user

@@ -1,0 +1,63 @@
+attachments: []
+collaborators:
+- ''
+created_at: '2024-06-19T09:31:28.921690'
+deliverables: []
+description: ''
+due_date: null
+id: 1
+name: New Projects
+notes: ''
+priority: none
+prompt: 'Here is the rephrased prompt:
+
+
+  Design a basic accounting system for a small business, incorporating the following
+  features:
+
+
+  Track income and expenses for a hypothetical company, ''ABC Inc.''
+
+
+  Create separate accounts for:
+
+  Revenues (e.g. sales, services, investments)
+
+
+  Expenses (e.g. payroll, rent, supplies, utilities)
+
+
+  Assets (e.g. cash, inventory, equipment)
+
+
+  Liabilities (e.g. debts, loans, credit cards)
+
+
+  Provide examples for the following:
+
+
+  Income Statement: Calculate revenue and net income for Q1-Q4
+
+  Balance Sheet: Report asset, liability, and equity values for the same period
+
+
+  Include an example of how to handle journal entries for expenses, sales tax, and
+  depreciation.
+
+
+  Consider a scenario where the business experiences fluctuations in cash flow and
+  provide suggestions for managing these changes.
+
+
+  Ensure scalability for 2-3 additional employees and account types.
+
+
+  How would you modify the system to account for changes in government regulations,
+  industry standards, or new tax laws?'
+status: not started
+tags: []
+tools: []
+updated_at: '2024-06-19T12:51:24.798774'
+user_id: user
+workflows:
+- New Workflowz

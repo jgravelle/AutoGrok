@@ -43,13 +43,19 @@ def handle_workflow_name_change():
     if new_workflow_name:
         old_workflow_name = st.session_state.current_workflow.name
         st.session_state.current_workflow.name = new_workflow_name
-        update_workflow()
+        
+        # Rename the workflow file
+        old_file_path = f"workflows/{old_workflow_name}.yaml"
+        new_file_path = f"workflows/{new_workflow_name}.yaml"
+        os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
         if st.session_state.current_project and old_workflow_name in st.session_state.current_project.workflows:
             index = st.session_state.current_project.workflows.index(old_workflow_name)
             st.session_state.current_project.workflows[index] = new_workflow_name
             update_project()
+        
+        update_workflow()
 
 
 def handle_workflow_selection():
