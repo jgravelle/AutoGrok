@@ -1,0 +1,65 @@
+content: 'Here is the Python tool file as requested:
+
+
+  # Tool filename: compound_interest.py
+
+  # Import necessary module(s)
+
+  import math
+
+
+  def calculate_compound_interest(principal, rate, time, frequency):
+
+  # docstrings
+
+  """
+
+  Calculates the compounded interest on a principal amount.
+
+
+  Parameters:
+
+  principal (float): The initial principal amount.
+
+  rate (float): The interest rate, expressed as a decimal.
+
+  time (float): The time in years for which the interest is calculated.
+
+  frequency (int): The number of times interest is compounded per time period.
+
+
+  Returns:
+
+  float: The total value of the investment after compounding interest.
+
+
+  """
+
+  # Body of tool
+
+
+  # Calculate the compounded interest
+
+  amount = principal * (1 + rate / frequency) ** (frequency * time)
+
+
+  return amount
+
+
+  # Example usage:
+
+  # principal = 1000
+
+  # rate = 0.05
+
+  # time = 5
+
+  # frequency = 2
+
+  # print(calculate_compound_interest(principal, rate, time, frequency))'
+description: null
+file_name: compound_interest.json
+name: compound_interest
+timestamp: '2024-06-20T17:34:19.669522'
+title: compound_interest
+user_id: default
