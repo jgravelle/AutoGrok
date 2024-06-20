@@ -45,8 +45,8 @@ def handle_workflow_name_change():
         st.session_state.current_workflow.name = new_workflow_name
         
         # Rename the workflow file
-        old_file_path = f"workflows/{old_workflow_name}.yaml"
-        new_file_path = f"workflows/{new_workflow_name}.yaml"
+        old_file_path = f"workflows/yaml/{old_workflow_name}.yaml"
+        new_file_path = f"workflows/yaml/{new_workflow_name}.yaml"
         os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
@@ -65,7 +65,7 @@ def handle_workflow_selection():
     if selected_workflow == "Create...":
         workflow_name = st.session_state.workflow_name_input.strip()
         if workflow_name:
-            workflow = WorkflowBaseModel(
+            workflow = WorkflowBaseModel(   
                 name=workflow_name,
                 description="This workflow is used for general purpose tasks.",
                 sender=Sender(
@@ -208,5 +208,5 @@ def update_workflow():
     st.session_state.current_workflow.updated_at = datetime.now().isoformat()
     workflow_name = st.session_state.current_workflow.name
     workflow_data = st.session_state.current_workflow.to_dict()
-    with open(f"workflows/{workflow_name}.yaml", "w") as file:
+    with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
         yaml.dump(workflow_data, file)

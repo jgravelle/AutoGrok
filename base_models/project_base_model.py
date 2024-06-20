@@ -59,14 +59,14 @@ class ProjectBaseModel:
         
         # Create a YAML file for the project
         project_data = project.to_dict()
-        with open(f"projects/{project_name}.yaml", "w") as file:
+        with open(f"projects/yaml/{project_name}.yaml", "w") as file:
             yaml.dump(project_data, file)
         
         return project
 
     @classmethod
     def get_project(cls, project_name: str) -> "ProjectBaseModel":
-        file_path = f"projects/{project_name}.yaml"
+        file_path = f"projects/yaml/{project_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 project_data = yaml.safe_load(file)
@@ -77,7 +77,7 @@ class ProjectBaseModel:
     @staticmethod
     def load_projects() -> List[str]:
         project_names = []
-        for file in os.listdir("projects"):
+        for file in os.listdir("projects/yaml"):
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)

@@ -285,7 +285,7 @@ class WorkflowBaseModel:
 
         # Create a YAML file for the workflow with the default values
         workflow_data = workflow.to_dict()
-        with open(f"workflows/{workflow_name}.yaml", "w") as file:
+        with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
             yaml.dump(workflow_data, file)
 
         return workflow
@@ -295,7 +295,7 @@ class WorkflowBaseModel:
     def get_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Loading workflow: {workflow_name}")
-        file_path = f"workflows/{workflow_name}.yaml"
+        file_path = f"workflows/yaml/{workflow_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 workflow_data = yaml.safe_load(file)
@@ -309,7 +309,7 @@ class WorkflowBaseModel:
         if DEBUG:
             print("Loading workflows")
         project_names = []
-        for file in os.listdir("workflows"):
+        for file in os.listdir("workflows/yaml"):
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)

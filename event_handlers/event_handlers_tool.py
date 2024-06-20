@@ -78,7 +78,7 @@ def handle_tool_property_change():
 
         tool_data = tool.to_dict()
         tool_name = tool.name
-        with open(f"tools/{tool_name}.yaml", "w") as file:
+        with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
 
 
@@ -128,5 +128,5 @@ def update_tool():
     st.session_state.current_tool.updated_at = datetime.now().isoformat()
     tool_name = st.session_state.current_tool.name
     tool_data = st.session_state.current_tool.to_dict()
-    with open(f"tools/{tool_name}.yaml", "w") as file:
+    with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
         yaml.dump(tool_data, file)

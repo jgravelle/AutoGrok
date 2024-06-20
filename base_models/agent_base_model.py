@@ -138,14 +138,14 @@ class AgentBaseModel:
         agent = cls.from_dict(agent_data)
         
         # Create a YAML file for the agent
-        with open(f"agents/{agent_name}.yaml", "w") as file:
+        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
         
         return agent
 
     @classmethod
     def get_agent(cls, agent_name: str) -> "AgentBaseModel":
-        file_path = f"agents/{agent_name}.yaml"
+        file_path = f"agents/yaml/{agent_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 agent_data = yaml.safe_load(file)
@@ -156,7 +156,7 @@ class AgentBaseModel:
     @staticmethod
     def load_agents() -> List[str]:
         agent_names = []
-        for file in os.listdir("agents"):
+        for file in os.listdir("agents/yaml"):
             if file.endswith(".yaml"):
                 agent_name = file[:-5]  # Remove the ".yaml" extension
                 agent_names.append(agent_name)

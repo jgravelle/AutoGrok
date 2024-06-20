@@ -51,14 +51,14 @@ class ToolBaseModel:
         tool = cls.from_dict(tool_data)
         
         # Create a YAML file for the tool
-        with open(f"tools/{tool_name}.yaml", "w") as file:
+        with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
         
         return tool
 
     @classmethod
     def get_tool(cls, tool_name: str) -> "ToolBaseModel":
-        file_path = f"tools/{tool_name}.yaml"
+        file_path = f"tools/yaml/{tool_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 tool_data = yaml.safe_load(file)

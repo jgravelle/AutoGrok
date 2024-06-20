@@ -22,6 +22,7 @@ def display_project_dropdown():
     if st.session_state.current_project is None:
         # Display the projects dropdown
         project_names = ProjectBaseModel.load_projects()
+        project_names.sort()
         selected_project = st.selectbox(
             "Projects",
             ["Select..."] + ["Create..."] + project_names,

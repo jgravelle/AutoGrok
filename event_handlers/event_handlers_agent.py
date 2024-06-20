@@ -84,7 +84,7 @@ def handle_agent_property_change():
 
         agent_data = agent.to_dict()
         agent_name = agent.name
-        with open(f"agents/{agent_name}.yaml", "w") as file:
+        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
 
 
@@ -137,5 +137,5 @@ def update_agent():
     st.session_state.current_agent.updated_at = datetime.now().isoformat()
     agent_name = st.session_state.current_agent.name
     agent_data = st.session_state.current_agent.to_dict()
-    with open(f"agents/{agent_name}.yaml", "w") as file:
+    with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
         yaml.dump(agent_data, file)

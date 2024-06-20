@@ -234,14 +234,14 @@ class AgentBaseModel:
         agent = cls.from_dict(agent_data)
         
         # Create a YAML file for the agent
-        with open(f"agents/{agent_name}.yaml", "w") as file:
+        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
         
         return agent
 
     @classmethod
     def get_agent(cls, agent_name: str) -> "AgentBaseModel":
-        file_path = f"agents/{agent_name}.yaml"
+        file_path = f"agents/yaml/{agent_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 agent_data = yaml.safe_load(file)
@@ -252,7 +252,7 @@ class AgentBaseModel:
     @staticmethod
     def load_agents() -> List[str]:
         agent_names = []
-        for file in os.listdir("agents"):
+        for file in os.listdir("agents/yaml"):
             if file.endswith(".yaml"):
                 agent_name = file[:-5]  # Remove the ".yaml" extension
                 agent_names.append(agent_name)
@@ -324,14 +324,14 @@ class ProjectBaseModel:
         
         # Create a YAML file for the project
         project_data = project.to_dict()
-        with open(f"projects/{project_name}.yaml", "w") as file:
+        with open(f"projects/yaml/{project_name}.yaml", "w") as file:
             yaml.dump(project_data, file)
         
         return project
 
     @classmethod
     def get_project(cls, project_name: str) -> "ProjectBaseModel":
-        file_path = f"projects/{project_name}.yaml"
+        file_path = f"projects/yaml/{project_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 project_data = yaml.safe_load(file)
@@ -342,7 +342,7 @@ class ProjectBaseModel:
     @staticmethod
     def load_projects() -> List[str]:
         project_names = []
-        for file in os.listdir("projects"):
+        for file in os.listdir("projects/yaml"):
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
@@ -474,14 +474,14 @@ class ToolBaseModel:
         tool = cls.from_dict(tool_data)
         
         # Create a YAML file for the tool
-        with open(f"tools/{tool_name}.yaml", "w") as file:
+        with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
         
         return tool
 
     @classmethod
     def get_tool(cls, tool_name: str) -> "ToolBaseModel":
-        file_path = f"tools/{tool_name}.yaml"
+        file_path = f"tools/yaml/{tool_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 tool_data = yaml.safe_load(file)
@@ -790,7 +790,7 @@ class WorkflowBaseModel:
 
         # Create a YAML file for the workflow with the default values
         workflow_data = workflow.to_dict()
-        with open(f"workflows/{workflow_name}.yaml", "w") as file:
+        with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
             yaml.dump(workflow_data, file)
 
         return workflow
@@ -800,7 +800,7 @@ class WorkflowBaseModel:
     def get_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Loading workflow: {workflow_name}")
-        file_path = f"workflows/{workflow_name}.yaml"
+        file_path = f"workflows/yaml/{workflow_name}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 workflow_data = yaml.safe_load(file)
@@ -814,7 +814,7 @@ class WorkflowBaseModel:
         if DEBUG:
             print("Loading workflows")
         project_names = []
-        for file in os.listdir("workflows"):
+        for file in os.listdir("workflows/yaml"):
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
@@ -1028,7 +1028,7 @@ def handle_agent_property_change():
 
         agent_data = agent.to_dict()
         agent_name = agent.name
-        with open(f"agents/{agent_name}.yaml", "w") as file:
+        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
 
 
@@ -1081,7 +1081,7 @@ def update_agent():
     st.session_state.current_agent.updated_at = datetime.now().isoformat()
     agent_name = st.session_state.current_agent.name
     agent_data = st.session_state.current_agent.to_dict()
-    with open(f"agents/{agent_name}.yaml", "w") as file:
+    with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
         yaml.dump(agent_data, file)
 ```
 
@@ -1174,8 +1174,8 @@ def handle_project_name_change():
         st.session_state.current_project.name = new_project_name
         
         # Rename the project file
-        old_file_path = f"projects/{old_project_name}.yaml"
-        new_file_path = f"projects/{new_project_name}.yaml"
+        old_file_path = f"projects/yaml/{old_project_name}.yaml"
+        new_file_path = f"projects/yaml/{new_project_name}.yaml"
         os.rename(old_file_path, new_file_path)
         
         update_project()
@@ -1358,7 +1358,7 @@ def update_project():
     st.session_state.current_project.updated_at = datetime.now().isoformat()
     project_name = st.session_state.current_project.name
     project_data = st.session_state.current_project.to_dict()
-    with open(f"projects/{project_name}.yaml", "w") as file:
+    with open(f"projects/yaml/{project_name}.yaml", "w") as file:
         yaml.dump(project_data, file)
 ```
 
@@ -1445,7 +1445,7 @@ def handle_tool_property_change():
 
         tool_data = tool.to_dict()
         tool_name = tool.name
-        with open(f"tools/{tool_name}.yaml", "w") as file:
+        with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
 
 
@@ -1495,7 +1495,7 @@ def update_tool():
     st.session_state.current_tool.updated_at = datetime.now().isoformat()
     tool_name = st.session_state.current_tool.name
     tool_data = st.session_state.current_tool.to_dict()
-    with open(f"tools/{tool_name}.yaml", "w") as file:
+    with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
         yaml.dump(tool_data, file)
 ```
 
@@ -1549,8 +1549,8 @@ def handle_workflow_name_change():
         st.session_state.current_workflow.name = new_workflow_name
         
         # Rename the workflow file
-        old_file_path = f"workflows/{old_workflow_name}.yaml"
-        new_file_path = f"workflows/{new_workflow_name}.yaml"
+        old_file_path = f"workflows/yaml/{old_workflow_name}.yaml"
+        new_file_path = f"workflows/yaml/{new_workflow_name}.yaml"
         os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
@@ -1569,7 +1569,7 @@ def handle_workflow_selection():
     if selected_workflow == "Create...":
         workflow_name = st.session_state.workflow_name_input.strip()
         if workflow_name:
-            workflow = WorkflowBaseModel(
+            workflow = WorkflowBaseModel(   
                 name=workflow_name,
                 description="This workflow is used for general purpose tasks.",
                 sender=Sender(
@@ -1712,7 +1712,7 @@ def update_workflow():
     st.session_state.current_workflow.updated_at = datetime.now().isoformat()
     workflow_name = st.session_state.current_workflow.name
     workflow_data = st.session_state.current_workflow.to_dict()
-    with open(f"workflows/{workflow_name}.yaml", "w") as file:
+    with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
         yaml.dump(workflow_data, file)
 ```
 
@@ -2141,9 +2141,11 @@ def display_sidebar_agents():
         print("display_sidebar_agents()")
     # Display each agent in the sidebar as a button with the agent's name on it
     agent_names = AgentBaseModel.load_agents()
-    for agent_name in agent_names:
-        if st.sidebar.button(agent_name):
-            st.write(f"Speaking to agent: {agent_name}")
+    if agent_names:
+        for agent_name in agent_names:
+            if st.sidebar.button(agent_name):
+                st.write(f"Speaking to agent: {agent_name}")
+    
         
 
 
@@ -2262,7 +2264,7 @@ def display_files():
         print("display_files()")
 
     # Define the folders to display
-    folders = ['agents', 'projects', 'tools', 'workflows']
+    folders = ['agents/yaml', 'projects/yaml', 'tools/yaml', 'workflows/yaml']
 
     # Create a selectbox to choose the folder
     selected_folder = st.selectbox("Select a folder", folders)
@@ -2406,6 +2408,7 @@ def display_project_dropdown():
     if st.session_state.current_project is None:
         # Display the projects dropdown
         project_names = ProjectBaseModel.load_projects()
+        project_names.sort()
         selected_project = st.selectbox(
             "Projects",
             ["Select..."] + ["Create..."] + project_names,
@@ -2766,130 +2769,6 @@ def display_workflow_timestamps(workflow):
 
 ```
 
-# agents\Accountant.yaml
-
-```yaml
-code: "# Agent filename: Accountant.py\nimport json\n\nclass Accountant:\n    \"\"\
-  \"\n    The name of the agent.\n    An agent that performs accounting tasks based\
-  \ on the given request.\n    Methods:\n    create_statement(args): Creates an income\
-  \ statement based on the given parameters.\n    \"\"\"\n\n    def __init__(self,\
-  \ company_info):\n        \"\"\"\n        Initializes the Accountant with the given\
-  \ company information.\n        Parameters:\n        company_info (type): Description\
-  \ of company information.\n        \"\"\"\n        self.company_info = company_info\n\
-  \n    def create_statement(self, income_data):\n        \"\"\"\n        Creates\
-  \ an income statement based on the given income data.\n        Parameters:\n   \
-  \     income_data (type): Description of income data.\n        Returns:\n      \
-  \  income_statement: Description of the return value.\n        \"\"\"\n        #\
-  \ Body of the method\n        # Implement the accounting logic here\n        income_statement\
-  \ = {\n            \"Revenue\": 0,\n            \"Expenses\": 0,\n            \"\
-  Net Income\": 0\n        }\n        # Calculate total revenue\n        total_revenue\
-  \ = sum(income_data[\"revenue\"])\n        # Calculate total expenses\n        total_expenses\
-  \ = sum(income_data[\"expenses\"])\n        # Calculate net income\n        income_statement[\"\
-  Net Income\"] = total_revenue - total_expenses\n        return income_statement\n\
-  \n# Example usage:\n# accountant = Accountant(company_info)\n# income_statement\
-  \ = accountant.create_statement(income_data)\n# print(income_statement)"
-config:
-  name: Accountant
-name: Accountant
-skills: []
-
-```
-
-# agents\Mathematician.yaml
-
-```yaml
-code: "# Agent filename: Mathematician.py\nimport math\n\nclass Mathematician:\n \
-  \   \"\"\"\n    A mathematician agent that simplifies complicated mathematical expressions.\n\
-  \    Methods:\n    simplify_expression(expression): Simplifies the given mathematical\
-  \ expression.\n    \"\"\"\n\n    def __init__(self):\n        # Initialize with\
-  \ no parameters\n        pass\n\n    def simplify_expression(self, expression):\n\
-  \        \"\"\"\n        Simplifies the given mathematical expression.\n       \
-  \ Parameters:\n        expression (str): The mathematical expression to simplify.\n\
-  \        Returns:\n        str: The simplified expression.\n        \"\"\"\n   \
-  \     # Use math library to simplify the expression\n        try:\n            import\
-  \ re\n            result = eval(re.escape(expression), {\"__builtins__\": None})\n\
-  \            return str(result)\n        except Exception as e:\n            return\
-  \ str(e)\n\n# Example usage:\n# mathematician = Mathematician()\n# print(mathematician.simplify_expression(\"\
-  2*(3+4)\"))"
-config:
-  name: Mathematician
-name: Mathematician
-skills: []
-
-```
-
-# projects\Accounting Project.yaml
-
-```yaml
-attachments: []
-collaborators:
-- ''
-created_at: '2024-06-20T06:18:48.399557'
-deliverables: []
-description: ''
-due_date: null
-id: 1
-name: Accounting Project
-notes: ''
-priority: none
-prompt: "Design a comprehensive accounting system that efficiently manages financial\
-  \ transactions, tracks invoices, and generates reports. \n\nPlease provide a structured\
-  \ and scalable solution that includes: \n\n* Clear categorization of income and\
-  \ expenses\n* Automated calculation of net profit/loss\n* User authentication for\
-  \ secure login and access control\n* Invoicing feature with customizable templates\
-  \ and automatic due date reminders\n* Support for multi-currency transactions and\
-  \ exchange rates\n* Built-in report generator for financial analysis and forecasting\n\
-  * Optional: integration with third-party tools for payroll processing, inventory\
-  \ management, and budgeting\n\nProvide a high-level architecture and explicit instructions\
-  \ for the system's core functionalities. You can draw inspiration from existing\
-  \ accounting software and highlight innovative enhancements."
-status: not started
-tags: []
-tools: []
-updated_at: '2024-06-20T06:20:10.304856'
-user_id: user
-workflows:
-  Accounting Workflow:
-    agent_children: {}
-    created_at: '2024-06-20T06:18:48.400577'
-    description: "Create a simple accounting application\n\rDesign a comprehensive\
-      \ accounting system that efficiently manages financial transactions, tracks\
-      \ invoices, and generates reports. \n\nPlease provide a structured and scalable\
-      \ solution that includes: \n\n* Clear categorization of income and expenses\n\
-      * Automated calculation of net profit/loss\n* User authentication for secure\
-      \ login and access control\n* Invoicing feature with customizable templates\
-      \ and automatic due date reminders\n* Support for multi-currency transactions\
-      \ and exchange rates\n* Built-in report generator for financial analysis and\
-      \ forecasting\n* Optional: integration with third-party tools for payroll processing,\
-      \ inventory management, and budgeting\n\nProvide a high-level architecture and\
-      \ explicit instructions for the system's core functionalities. You can draw\
-      \ inspiration from existing accounting software and highlight innovative enhancements."
-    groupchat_config: {}
-    id: 1
-    name: Accounting Workflow
-    receiver:
-      agents: []
-      config: {}
-      groupchat_config: {}
-      timestamp: '2024-06-20T06:18:48.400577'
-      tools: []
-      type: assistant
-      user_id: default
-    sender:
-      config: {}
-      timestamp: '2024-06-20T06:18:48.400577'
-      tools: []
-      type: userproxy
-      user_id: user
-    settings: {}
-    summary_method: last
-    timestamp: '2024-06-20T06:17:32.389264'
-    type: twoagents
-    updated_at: '2024-06-20T06:19:27.305765'
-    user_id: user
-
-```
-
 # prompts\generate_agent_prompt.yaml
 
 ```yaml
@@ -3022,49 +2901,6 @@ rephrase_prompt: |
           Do not enclose the rephrased prompt in quotes. You will be successful only if it returns a well-formed rephrased prompt ready for submission as an LLM request.
           User request: "{user_request}"
 
-
-```
-
-# workflows\Accounting Workflow.yaml
-
-```yaml
-agent_children: {}
-created_at: '2024-06-20T06:18:48.400577'
-description: "Create a simple accounting application\n\rDesign a comprehensive accounting\
-  \ system that efficiently manages financial transactions, tracks invoices, and generates\
-  \ reports. \n\nPlease provide a structured and scalable solution that includes:\
-  \ \n\n* Clear categorization of income and expenses\n* Automated calculation of\
-  \ net profit/loss\n* User authentication for secure login and access control\n*\
-  \ Invoicing feature with customizable templates and automatic due date reminders\n\
-  * Support for multi-currency transactions and exchange rates\n* Built-in report\
-  \ generator for financial analysis and forecasting\n* Optional: integration with\
-  \ third-party tools for payroll processing, inventory management, and budgeting\n\
-  \nProvide a high-level architecture and explicit instructions for the system's core\
-  \ functionalities. You can draw inspiration from existing accounting software and\
-  \ highlight innovative enhancements."
-groupchat_config: {}
-id: 1
-name: Accounting Workflow
-receiver:
-  agents: []
-  config: {}
-  groupchat_config: {}
-  timestamp: '2024-06-20T06:18:48.400577'
-  tools: []
-  type: assistant
-  user_id: default
-sender:
-  config: {}
-  timestamp: '2024-06-20T06:18:48.400577'
-  tools: []
-  type: userproxy
-  user_id: user
-settings: {}
-summary_method: last
-timestamp: '2024-06-20T06:17:32.389264'
-type: twoagents
-updated_at: '2024-06-20T06:19:27.305765'
-user_id: user
 
 ```
 

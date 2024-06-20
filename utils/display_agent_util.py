@@ -57,9 +57,11 @@ def display_sidebar_agents():
         print("display_sidebar_agents()")
     # Display each agent in the sidebar as a button with the agent's name on it
     agent_names = AgentBaseModel.load_agents()
-    for agent_name in agent_names:
-        if st.sidebar.button(agent_name):
-            st.write(f"Speaking to agent: {agent_name}")
+    if agent_names:
+        for agent_name in agent_names:
+            if st.sidebar.button(agent_name):
+                st.write(f"Speaking to agent: {agent_name}")
+    
         
 
 

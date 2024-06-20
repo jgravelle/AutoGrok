@@ -73,8 +73,8 @@ def handle_project_name_change():
         st.session_state.current_project.name = new_project_name
         
         # Rename the project file
-        old_file_path = f"projects/{old_project_name}.yaml"
-        new_file_path = f"projects/{new_project_name}.yaml"
+        old_file_path = f"projects/yaml/{old_project_name}.yaml"
+        new_file_path = f"projects/yaml/{new_project_name}.yaml"
         os.rename(old_file_path, new_file_path)
         
         update_project()
