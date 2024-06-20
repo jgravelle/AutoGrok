@@ -34,6 +34,9 @@ def initialize_session_variables():
     if "default_provider_key" not in st.session_state:
         st.session_state.default_provider_key = None
 
+    if "file_content" not in st.session_state:
+        st.session_state.file_content = ""
+
     if "project_dropdown" not in st.session_state:
         st.session_state.project_dropdown = "Select..."
 

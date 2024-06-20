@@ -6,10 +6,11 @@ from configs.config_local import DEBUG
 
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
 from utils.display_debug_util import display_debug
+from utils.display_discussion_util import display_discussion
 from utils.display_files_util import display_files
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
-from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
+from utils.display_sidebar_util import display_sidebar
 from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
 from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
 
@@ -21,7 +22,7 @@ def display_main():
     with open("styles.css") as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     
-    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management"])
+    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab, discussionTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management", "Discussion"])
 
 #   PROJECTS
     with projectTab:
@@ -68,8 +69,11 @@ def display_main():
     with filesTab:
         display_files()
 
+    with discussionTab:
+        display_discussion()
+
 
 #   SIDEBAR
 def sidebar_begin():
-    display_sidebar_message()
-    display_sidebar_prompt_reengineer()
+    display_sidebar()
+    

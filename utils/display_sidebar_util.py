@@ -8,16 +8,32 @@ from configs.config_local import DEBUG
 from event_handlers.event_handlers_prompt import handle_prompt
 from event_handlers.event_handlers_shared import update_project
 from event_handlers.event_handlers_workflow import update_workflow
+from utils.display_agent_util import display_sidebar_agents
 
 
-def display_sidebar_message():
+def display_sidebar():
     if DEBUG:
         print("display_sidebar_message()")
+  
+    selected_tab = st.sidebar.selectbox("Select a tab:", ["Home", "Prompt", "Agents", "Tools"])
+        
+    if selected_tab == "Home":    
+        display_sidebar_home()
+    elif selected_tab == "Prompt":
+        display_sidebar_prompt_reengineer()
+    elif selected_tab == "Agents":
+        display_sidebar_agents()
+    else:
+        st.write("Content for Tab 3")
+
+    st.sidebar.image('gfx/AutoGroqLogo_sm.png')
+    
+
+def display_sidebar_home():
     st.sidebar.write("<div class='teeny'>Need agents right frickin' now? : <a href='https://autogroq.streamlit.app/'>https://autogroq.streamlit.app/</a></div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> </div>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>Universal AI Agents Made Easy. <br/> Theoretically.</div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>We're putting the 'mental' in 'experimental'.</div>", unsafe_allow_html=True)
-    st.sidebar.write("<div class='teeny'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='teeny yellow'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)  
 
 
 def display_sidebar_prompt_reengineer():

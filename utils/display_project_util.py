@@ -52,10 +52,9 @@ def display_project_properties(project):
         print("display_project_properties()")
     # Display the properties of the current project
     if st.session_state.current_project is not None:
-        # Display the name of the first element in the project.workflows array
-        if len(st.session_state.current_project.workflows) > 0:
-            workflow = st.session_state.current_project.workflows[0]
-            st.write(f"<div class='workflow-name'>Workflow: {workflow}</div>", unsafe_allow_html=True)
+        st.write("Workflows:")
+        for workflow_name, workflow in project.workflows.items():
+            st.write(f"- {workflow_name}")
         project.prompt = st.text_area("Prompt:", value=project.prompt, key="prompt", on_change=handle_prompt_change)
         project.description = st.text_area("Description:", value=project.description or "", key="project_description", on_change=handle_project_description_change)
         status_options = [status.value for status in ProjectStatus]

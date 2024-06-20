@@ -51,3 +51,15 @@ def display_agent_properties():
     agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
     agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
     agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
+
+def display_sidebar_agents():
+    if DEBUG:
+        print("display_sidebar_agents()")
+    # Display each agent in the sidebar as a button with the agent's name on it
+    agent_names = AgentBaseModel.load_agents()
+    for agent_name in agent_names:
+        if st.sidebar.button(agent_name):
+            st.write(f"Speaking to agent: {agent_name}")
+        
+
+

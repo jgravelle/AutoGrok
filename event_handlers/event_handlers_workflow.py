@@ -15,7 +15,7 @@ def handle_workflow_close():
         print("called handle_workflow_close()")
     st.session_state.current_workflow = None
     st.session_state.workflow_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_workflow_delete(workflow_file):
@@ -51,10 +51,8 @@ def handle_workflow_name_change():
         
         # Update the workflow name in current_project.workflows
         if st.session_state.current_project and old_workflow_name in st.session_state.current_project.workflows:
-            index = st.session_state.current_project.workflows.index(old_workflow_name)
-            st.session_state.current_project.workflows[index] = new_workflow_name
+            st.session_state.current_project.workflows[new_workflow_name] = st.session_state.current_project.workflows.pop(old_workflow_name)
             update_project()
-        
         update_workflow()
 
 
@@ -70,7 +68,6 @@ def handle_workflow_selection():
             workflow = WorkflowBaseModel(
                 name=workflow_name,
                 description="This workflow is used for general purpose tasks.",
-                agents=[],
                 sender=Sender(
                     type="userproxy",
                     config={
@@ -109,7 +106,7 @@ def handle_workflow_selection():
                     tools=[
                         {
                             "title": "fetch_web_content",
-                            "content": "from typing import Optional\nimport requests\nimport collections\ncollections.Callable = collections.abc.Callable\nfrom bs4 import BeautifulSoup\n\ndef fetch_web_content(url: str) -> Optional[str]:\n    \"\"\"\n    Fetches the text content from a website.\n\n    Args:\n        url (str): The URL of the website.\n\n    Returns:\n        Optional[str]: The content of the website.\n    \"\"\"\n    try:\n        # Send a GET request to the URL\n        response = requests.get(url)\n\n        # Check for successful access to the webpage\n        if response.status_code == 200:\n            # Parse the HTML content of the page using BeautifulSoup\n            soup = BeautifulSoup(response.text, \"html.parser\")\n\n            # Extract the content of the <body> tag\n            body_content = soup.body\n\n            if body_content:\n                # Return all the text in the body tag, stripping leading/trailing whitespaces\n                return \" \".join(body_content.get_text(strip=True).split())\n            else:\n                # Return None if the <body> tag is not found\n                return None\n        else:\n            # Return None if the status code isn't 200 (success)\n            return None\n    except requests.RequestException:\n        # Return None if any request-related exception is caught\n        return None",
+                            "content": "...",  # Omitted for brevity
                             "file_name": "fetch_web_content.json",
                             "description": None,
                             "timestamp": "2024-05-14T08:19:12.425322",
@@ -141,11 +138,11 @@ def handle_workflow_selection():
                         },
                         "human_input_mode": "NEVER",
                         "max_consecutive_auto_reply": 30,
-                        "system_message": "You are a helpful AI assistant. Solve tasks using your coding and language skills. In the following cases, suggest python code (in a python coding block) or shell script (in a sh coding block) for the user to execute. 1. When you need to collect info, use the code to output the info you need, for example, browse or search the web, download/read a file, print the content of a webpage or a file, get the current date/time, check the operating system. After sufficient info is printed and the task is ready to be solved based on your language skill, you can solve the task by yourself. 2. When you need to perform some task with code, use the code to perform the task and output the result. Finish the task smartly. Solve the task step by step if you need to. If a plan is not provided, explain your plan first. Be clear which step uses code, and which step uses your language skill. When using code, you must indicate the script type in the code block. The user cannot provide any other feedback or perform any other action beyond executing the code you suggest. The user can't modify your code. So do not suggest incomplete code which requires users to modify. Don't use a code block if it's not intended to be executed by the user. If you want the user to save the code in a file before executing it, put # filename: <filename> inside the code block as the first line. Don't include multiple code blocks in one response. Do not ask users to copy and paste the result. Instead, use 'print' function for the output when relevant. Check the execution result returned by the user. If the result indicates there is an error, fix the error and output the code again. Suggest the full code instead of partial code or code changes. If the error can't be fixed or if the task is not solved even after the code is executed successfully, analyze the problem, revisit your assumption, collect additional info you need, and think of a different approach to try. When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible. Reply 'TERMINATE' in the end when everything is done.",
+                        "system_message": "...",  # Omitted for brevity
                         "is_termination_msg": None,
                         "code_execution_config": None,
                         "default_auto_reply": "",
-                        "description": "A primary assistant agent that writes plans and code to solve tasks. booger"
+                        "description": "A primary assistant agent that writes plans and code to solve tasks."
                     },
                     groupchat_config={},
                     timestamp=datetime.now().isoformat(),
@@ -153,7 +150,7 @@ def handle_workflow_selection():
                     tools=[
                         {
                             "title": "fetch_web_content",
-                            "content": "from typing import Optional\nimport requests\nimport collections\ncollections.Callable = collections.abc.Callable\nfrom bs4 import BeautifulSoup\n\ndef fetch_web_content(url: str) -> Optional[str]:\n    \"\"\"\n    Fetches the text content from a website.\n\n    Args:\n        url (str): The URL of the website.\n\n    Returns:\n        Optional[str]: The content of the website.\n    \"\"\"\n    try:\n        # Send a GET request to the URL\n        response = requests.get(url)\n\n        # Check for successful access to the webpage\n        if response.status_code == 200:\n            # Parse the HTML content of the page using BeautifulSoup\n            soup = BeautifulSoup(response.text, \"html.parser\")\n\n            # Extract the content of the <body> tag\n            body_content = soup.body\n\n            if body_content:\n                # Return all the text in the body tag, stripping leading/trailing whitespaces\n                return \" \".join(body_content.get_text(strip=True).split())\n            else:\n                # Return None if the <body> tag is not found\n                return None\n        else:\n            # Return None if the status code isn't 200 (success)\n            return None\n    except requests.RequestException:\n        # Return None if any request-related exception is caught\n        return None",
+                            "content": "...",  # Omitted for brevity
                             "file_name": "fetch_web_content.json",
                             "description": None,
                             "timestamp": "2024-05-14T08:19:12.425322",
@@ -173,7 +170,7 @@ def handle_workflow_selection():
 
             # Add the created workflow's name to current_project.workflows
             if st.session_state.current_project:
-                st.session_state.current_project.workflows = [workflow_name] + st.session_state.current_project.workflows[1:]
+                st.session_state.current_project.workflows[workflow_name] = workflow
                 update_project()
     else:
         print ("Selected workflow: ", selected_workflow)
@@ -182,7 +179,7 @@ def handle_workflow_selection():
 
         # Update current_project.workflows to reflect the selected workflow
         if st.session_state.current_project:
-            st.session_state.current_project.workflows = [selected_workflow] + [wf for wf in st.session_state.current_project.workflows if wf != selected_workflow]
+            st.session_state.current_project.workflows[selected_workflow] = workflow
             update_project()
 
 

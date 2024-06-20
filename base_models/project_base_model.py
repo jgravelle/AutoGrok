@@ -4,6 +4,7 @@ import enum
 import os
 import yaml
 
+from base_models.workflow_base_model import WorkflowBaseModel
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -26,7 +27,7 @@ class ProjectBaseModel:
         notes: Optional[str] = None,
         collaborators: Optional[List[str]] = None,
         tools: Optional[List[Dict]] = None,
-        workflows: Optional[List[Dict]] = None
+        workflows: Optional[Dict[str, "WorkflowBaseModel"]] = None
     ):
         self.id = id or 1
         self.prompt = prompt
@@ -44,10 +45,13 @@ class ProjectBaseModel:
         self.notes = notes
         self.collaborators = collaborators or []
         self.tools = tools or []
-        self.workflows = workflows or []
+        self.workflows = workflows or {}
 
     def add_deliverable(self, deliverable: str):
         self.deliverables.append({"text": deliverable, "done": False})
+
+    def add_workflow_child(self, workflow_name: str, workflow: "WorkflowBaseModel"):
+        self.workflows[workflow_name] = workflow
 
     @classmethod
     def create_project(cls, project_name: str) -> "ProjectBaseModel":
@@ -59,7 +63,6 @@ class ProjectBaseModel:
             yaml.dump(project_data, file)
         
         return project
-    
 
     @classmethod
     def get_project(cls, project_name: str) -> "ProjectBaseModel":
@@ -70,7 +73,6 @@ class ProjectBaseModel:
                 return cls.from_dict(project_data)
         else:
             raise FileNotFoundError(f"Project file not found: {file_path}")
-            
 
     @staticmethod
     def load_projects() -> List[str]:
@@ -110,11 +112,12 @@ class ProjectBaseModel:
             "notes": self.notes,
             "collaborators": self.collaborators,
             "tools": self.tools,
-            "workflows": self.workflows
+            "workflows": {name: workflow.to_dict() for name, workflow in self.workflows.items()}
         }
 
     @classmethod
     def from_dict(cls, data: Dict):
+        from base_models.workflow_base_model import WorkflowBaseModel  # Avoid circular import
         return cls(
             id=data.get("id"),
             prompt=data.get("prompt", ""),
@@ -132,9 +135,8 @@ class ProjectBaseModel:
             notes=data.get("notes"),
             collaborators=data.get("collaborators", []),
             tools=data.get("tools", []),
-            workflows=data.get("workflows", [])
+            workflows={name: WorkflowBaseModel.from_dict(workflow) for name, workflow in data.get("workflows", {}).items()}
         )
-    
 
 class ProjectPriority(enum.Enum):
     NONE = "none"
@@ -142,7 +144,6 @@ class ProjectPriority(enum.Enum):
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
-
 
 class ProjectStatus(enum.Enum):
     NOT_STARTED = "not started"

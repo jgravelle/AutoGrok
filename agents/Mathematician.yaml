@@ -1,0 +1,17 @@
+code: "# Agent filename: Mathematician.py\nimport math\n\nclass Mathematician:\n \
+  \   \"\"\"\n    A mathematician agent that simplifies complicated mathematical expressions.\n\
+  \    Methods:\n    simplify_expression(expression): Simplifies the given mathematical\
+  \ expression.\n    \"\"\"\n\n    def __init__(self):\n        # Initialize with\
+  \ no parameters\n        pass\n\n    def simplify_expression(self, expression):\n\
+  \        \"\"\"\n        Simplifies the given mathematical expression.\n       \
+  \ Parameters:\n        expression (str): The mathematical expression to simplify.\n\
+  \        Returns:\n        str: The simplified expression.\n        \"\"\"\n   \
+  \     # Use math library to simplify the expression\n        try:\n            import\
+  \ re\n            result = eval(re.escape(expression), {\"__builtins__\": None})\n\
+  \            return str(result)\n        except Exception as e:\n            return\
+  \ str(e)\n\n# Example usage:\n# mathematician = Mathematician()\n# print(mathematician.simplify_expression(\"\
+  2*(3+4)\"))"
+config:
+  name: Mathematician
+name: Mathematician
+skills: []

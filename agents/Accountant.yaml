@@ -1,0 +1,23 @@
+code: "# Agent filename: Accountant.py\nimport json\n\nclass Accountant:\n    \"\"\
+  \"\n    The name of the agent.\n    An agent that performs accounting tasks based\
+  \ on the given request.\n    Methods:\n    create_statement(args): Creates an income\
+  \ statement based on the given parameters.\n    \"\"\"\n\n    def __init__(self,\
+  \ company_info):\n        \"\"\"\n        Initializes the Accountant with the given\
+  \ company information.\n        Parameters:\n        company_info (type): Description\
+  \ of company information.\n        \"\"\"\n        self.company_info = company_info\n\
+  \n    def create_statement(self, income_data):\n        \"\"\"\n        Creates\
+  \ an income statement based on the given income data.\n        Parameters:\n   \
+  \     income_data (type): Description of income data.\n        Returns:\n      \
+  \  income_statement: Description of the return value.\n        \"\"\"\n        #\
+  \ Body of the method\n        # Implement the accounting logic here\n        income_statement\
+  \ = {\n            \"Revenue\": 0,\n            \"Expenses\": 0,\n            \"\
+  Net Income\": 0\n        }\n        # Calculate total revenue\n        total_revenue\
+  \ = sum(income_data[\"revenue\"])\n        # Calculate total expenses\n        total_expenses\
+  \ = sum(income_data[\"expenses\"])\n        # Calculate net income\n        income_statement[\"\
+  Net Income\"] = total_revenue - total_expenses\n        return income_statement\n\
+  \n# Example usage:\n# accountant = Accountant(company_info)\n# income_statement\
+  \ = accountant.create_statement(income_data)\n# print(income_statement)"
+config:
+  name: Accountant
+name: Accountant
+skills: []

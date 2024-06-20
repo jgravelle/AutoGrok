@@ -12,7 +12,7 @@ class AgentBaseModel:
         self,
         name: str,
         config: Dict,
-        skills: List[Dict],
+        tools: Optional[Dict[str, "ToolBaseModel"]] = None,
         role: str = "",
         goal: str = "",
         backstory: str = "",
@@ -41,15 +41,7 @@ class AgentBaseModel:
         self.name = name
         self.config = config
         self.description = config.get("description", "")
-        self.skills = [ToolBaseModel(
-            name=skill["title"],
-            title=skill["title"],
-            content=skill["content"],
-            file_name=skill["file_name"],
-            description=skill.get("description"),
-            timestamp=skill.get("timestamp"),
-            user_id=skill.get("user_id")
-        ) for skill in skills]
+        self.tools = tools or {}
         self.role = role
         self.goal = goal
         self.backstory = backstory
@@ -73,6 +65,8 @@ class AgentBaseModel:
         self.step_callback = step_callback
         self.cache = cache
 
+    def add_tool_child(self, tool_name: str, tool: "ToolBaseModel"):
+        self.tools[tool_name] = tool
 
     def to_dict(self):
         return {
@@ -83,7 +77,7 @@ class AgentBaseModel:
                 "description": self.description,
                 # ... other config values ...
             },
-            "skills": [skill.to_dict() for skill in self.skills],
+            "tools": {name: tool.to_dict() for name, tool in self.tools.items()},
             "role": self.role,
             "goal": self.goal,
             "backstory": self.backstory,
@@ -108,14 +102,13 @@ class AgentBaseModel:
             "cache": self.cache
         }
 
-
     @classmethod
     def from_dict(cls, data: Dict):
         return cls(
             id=data.get("id"),
             name=data["config"]["name"],
             config=data["config"],
-            skills=data["skills"],
+            tools={name: ToolBaseModel.from_dict(tool) for name, tool in data.get("tools", {}).items()},
             role=data.get("role", ""),
             goal=data.get("goal", ""),
             backstory=data.get("backstory", ""),

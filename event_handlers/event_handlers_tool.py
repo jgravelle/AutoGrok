@@ -61,7 +61,7 @@ def handle_tool_close():
         print("handle_tool_close()")
     st.session_state.current_tool = None
     st.session_state.tool_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_tool_property_change():

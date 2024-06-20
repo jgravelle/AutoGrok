@@ -92,7 +92,7 @@ class WorkflowBaseModel:
         self,
         name: str = "",
         description: str = "",
-        agents: List[AgentBaseModel] = [],
+        agent_children: Dict[str, "AgentBaseModel"] = None,
         sender: Sender = None,
         receiver: Receiver = None,
         type: str = "twoagents",
@@ -108,7 +108,7 @@ class WorkflowBaseModel:
         self.id = id or 1
         self.name = name or "New Workflow"
         self.description = description or "This workflow is used for general purpose tasks."
-        self.agents = agents or []
+        self.agent_children = agent_children or {}
         self.sender = sender or Sender(
             type="userproxy",
             config={},
@@ -139,7 +139,7 @@ class WorkflowBaseModel:
             "id": self.id,
             "name": self.name,
             "description": self.description,
-            "agents": [agent.to_dict() for agent in self.agents],
+            "agent_children": {name: agent.to_dict() for name, agent in self.agent_children.items()},
             "sender": self.sender.to_dict(),
             "receiver": self.receiver.to_dict(),
             "type": self.type,
@@ -153,6 +153,30 @@ class WorkflowBaseModel:
         }
 
     @classmethod
+    def from_dict(cls, data: Dict):
+        sender = Sender.from_dict(data["sender"])
+        receiver = Receiver.from_dict(data["receiver"])
+        return cls(
+            id=data.get("id"),
+            name=data["name"],
+            description=data["description"],
+            agent_children={name: AgentBaseModel.from_dict(agent) for name, agent in data.get("agent_children", {}).items()},
+            sender=sender,
+            receiver=receiver,
+            type=data["type"],
+            user_id=data["user_id"],
+            timestamp=data["timestamp"],
+            summary_method=data["summary_method"],
+            settings=data.get("settings", {}),
+            groupchat_config=data.get("groupchat_config", {}),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+        )
+
+    def add_agent_child(self, agent_name: str, agent: "AgentBaseModel"):
+        self.agent_children[agent_name] = agent
+
+    @classmethod
     def create_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Creating workflow {workflow_name}")
@@ -162,7 +186,6 @@ class WorkflowBaseModel:
         workflow = cls(
             name=workflow_name,
             description=st.session_state.current_project.prompt if st.session_state.current_project else "This workflow is used for general purpose tasks.",
-            agents=[],
             sender=Sender(
                 type="userproxy",
                 config={
@@ -266,28 +289,6 @@ class WorkflowBaseModel:
             yaml.dump(workflow_data, file)
 
         return workflow
-
-    
-    @classmethod
-    def from_dict(cls, data: Dict):
-        sender = Sender.from_dict(data["sender"])
-        receiver = Receiver.from_dict(data["receiver"])
-        return cls(
-            id=data.get("id"),
-            name=data["name"],
-            description=data["description"],
-            agents=[AgentBaseModel.from_dict(agent) for agent in data.get("agents", [])],
-            sender=sender,
-            receiver=receiver,
-            type=data["type"],
-            user_id=data["user_id"],
-            timestamp=data["timestamp"],
-            summary_method=data["summary_method"],
-            settings=data.get("settings", {}),
-            groupchat_config=data.get("groupchat_config", {}),
-            created_at=data.get("created_at"),
-            updated_at=data.get("updated_at"),
-        )
     
 
     @classmethod

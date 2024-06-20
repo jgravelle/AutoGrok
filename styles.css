@@ -7,6 +7,10 @@
     width: 100%;
 }
 
+.red {
+    color: #FF0000;
+}
+
 .teeny {
     font-size: 0.75em;
     text-align: center;
@@ -16,6 +20,10 @@
 .timestamp {
     text-align: right;
     width: 100%;
+}
+
+.yellow {
+    color: #f5ff33;
 }
 
 h1, .title {

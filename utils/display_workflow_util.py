@@ -52,10 +52,10 @@ def display_workflow_properties(workflow):
 
         # Add more workflow properties as needed
 
-        # Display agents, sender, and receiver information
+        # Display agent children
         st.write("Agents:")
-        for agent in workflow.agents:
-            st.write(f"- {agent.name}")
+        for agent_name, agent in workflow.agent_children.items():
+            st.write(f"- {agent_name}")
 
         with st.container(border=True):
             st.write("Sender:")

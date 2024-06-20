@@ -38,7 +38,7 @@ def handle_project_close():
     # Close the current workflow
     handle_workflow_close()
     
-    st.rerun()
+    # st.rerun()
 
 
 def handle_project_delete():
@@ -110,15 +110,8 @@ def handle_project_selection():
         project = ProjectBaseModel.get_project(selected_project)
         st.session_state.current_project = project
 
-        # Check if the specified workflow exists and load it
-        if project.workflows:
-            workflow_name = project.workflows[0]
-            try:
-                workflow = WorkflowBaseModel.get_workflow(workflow_name)
-                st.session_state.current_workflow = workflow
-                st.session_state.workflow_dropdown = workflow_name
-            except FileNotFoundError:
-                st.warning(f"Workflow '{workflow_name}' not found for project '{project.name}'.")
+        # Load the workflows for the selected project
+        st.session_state.current_project.workflows = project.workflows
 
 
 def handle_project_status_change():

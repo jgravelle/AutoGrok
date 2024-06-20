@@ -63,6 +63,9 @@ def initialize_session_variables():
     if "default_provider_key" not in st.session_state:
         st.session_state.default_provider_key = None
 
+    if "file_content" not in st.session_state:
+        st.session_state.file_content = ""
+
     if "project_dropdown" not in st.session_state:
         st.session_state.project_dropdown = "Select..."
 
@@ -105,7 +108,7 @@ class AgentBaseModel:
         self,
         name: str,
         config: Dict,
-        skills: List[Dict],
+        tools: Optional[Dict[str, "ToolBaseModel"]] = None,
         role: str = "",
         goal: str = "",
         backstory: str = "",
@@ -134,15 +137,7 @@ class AgentBaseModel:
         self.name = name
         self.config = config
         self.description = config.get("description", "")
-        self.skills = [ToolBaseModel(
-            name=skill["title"],
-            title=skill["title"],
-            content=skill["content"],
-            file_name=skill["file_name"],
-            description=skill.get("description"),
-            timestamp=skill.get("timestamp"),
-            user_id=skill.get("user_id")
-        ) for skill in skills]
+        self.tools = tools or {}
         self.role = role
         self.goal = goal
         self.backstory = backstory
@@ -166,6 +161,8 @@ class AgentBaseModel:
         self.step_callback = step_callback
         self.cache = cache
 
+    def add_tool_child(self, tool_name: str, tool: "ToolBaseModel"):
+        self.tools[tool_name] = tool
 
     def to_dict(self):
         return {
@@ -176,7 +173,7 @@ class AgentBaseModel:
                 "description": self.description,
                 # ... other config values ...
             },
-            "skills": [skill.to_dict() for skill in self.skills],
+            "tools": {name: tool.to_dict() for name, tool in self.tools.items()},
             "role": self.role,
             "goal": self.goal,
             "backstory": self.backstory,
@@ -201,14 +198,13 @@ class AgentBaseModel:
             "cache": self.cache
         }
 
-
     @classmethod
     def from_dict(cls, data: Dict):
         return cls(
             id=data.get("id"),
             name=data["config"]["name"],
             config=data["config"],
-            skills=data["skills"],
+            tools={name: ToolBaseModel.from_dict(tool) for name, tool in data.get("tools", {}).items()},
             role=data.get("role", ""),
             goal=data.get("goal", ""),
             backstory=data.get("backstory", ""),
@@ -273,6 +269,7 @@ import enum
 import os
 import yaml
 
+from base_models.workflow_base_model import WorkflowBaseModel
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -295,7 +292,7 @@ class ProjectBaseModel:
         notes: Optional[str] = None,
         collaborators: Optional[List[str]] = None,
         tools: Optional[List[Dict]] = None,
-        workflows: Optional[List[Dict]] = None
+        workflows: Optional[Dict[str, "WorkflowBaseModel"]] = None
     ):
         self.id = id or 1
         self.prompt = prompt
@@ -313,10 +310,13 @@ class ProjectBaseModel:
         self.notes = notes
         self.collaborators = collaborators or []
         self.tools = tools or []
-        self.workflows = workflows or []
+        self.workflows = workflows or {}
 
     def add_deliverable(self, deliverable: str):
         self.deliverables.append({"text": deliverable, "done": False})
+
+    def add_workflow_child(self, workflow_name: str, workflow: "WorkflowBaseModel"):
+        self.workflows[workflow_name] = workflow
 
     @classmethod
     def create_project(cls, project_name: str) -> "ProjectBaseModel":
@@ -328,7 +328,6 @@ class ProjectBaseModel:
             yaml.dump(project_data, file)
         
         return project
-    
 
     @classmethod
     def get_project(cls, project_name: str) -> "ProjectBaseModel":
@@ -339,7 +338,6 @@ class ProjectBaseModel:
                 return cls.from_dict(project_data)
         else:
             raise FileNotFoundError(f"Project file not found: {file_path}")
-            
 
     @staticmethod
     def load_projects() -> List[str]:
@@ -379,11 +377,12 @@ class ProjectBaseModel:
             "notes": self.notes,
             "collaborators": self.collaborators,
             "tools": self.tools,
-            "workflows": self.workflows
+            "workflows": {name: workflow.to_dict() for name, workflow in self.workflows.items()}
         }
 
     @classmethod
     def from_dict(cls, data: Dict):
+        from base_models.workflow_base_model import WorkflowBaseModel  # Avoid circular import
         return cls(
             id=data.get("id"),
             prompt=data.get("prompt", ""),
@@ -401,9 +400,8 @@ class ProjectBaseModel:
             notes=data.get("notes"),
             collaborators=data.get("collaborators", []),
             tools=data.get("tools", []),
-            workflows=data.get("workflows", [])
+            workflows={name: WorkflowBaseModel.from_dict(workflow) for name, workflow in data.get("workflows", {}).items()}
         )
-    
 
 class ProjectPriority(enum.Enum):
     NONE = "none"
@@ -411,7 +409,6 @@ class ProjectPriority(enum.Enum):
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
-
 
 class ProjectStatus(enum.Enum):
     NOT_STARTED = "not started"
@@ -600,7 +597,7 @@ class WorkflowBaseModel:
         self,
         name: str = "",
         description: str = "",
-        agents: List[AgentBaseModel] = [],
+        agent_children: Dict[str, "AgentBaseModel"] = None,
         sender: Sender = None,
         receiver: Receiver = None,
         type: str = "twoagents",
@@ -616,7 +613,7 @@ class WorkflowBaseModel:
         self.id = id or 1
         self.name = name or "New Workflow"
         self.description = description or "This workflow is used for general purpose tasks."
-        self.agents = agents or []
+        self.agent_children = agent_children or {}
         self.sender = sender or Sender(
             type="userproxy",
             config={},
@@ -647,7 +644,7 @@ class WorkflowBaseModel:
             "id": self.id,
             "name": self.name,
             "description": self.description,
-            "agents": [agent.to_dict() for agent in self.agents],
+            "agent_children": {name: agent.to_dict() for name, agent in self.agent_children.items()},
             "sender": self.sender.to_dict(),
             "receiver": self.receiver.to_dict(),
             "type": self.type,
@@ -661,6 +658,30 @@ class WorkflowBaseModel:
         }
 
     @classmethod
+    def from_dict(cls, data: Dict):
+        sender = Sender.from_dict(data["sender"])
+        receiver = Receiver.from_dict(data["receiver"])
+        return cls(
+            id=data.get("id"),
+            name=data["name"],
+            description=data["description"],
+            agent_children={name: AgentBaseModel.from_dict(agent) for name, agent in data.get("agent_children", {}).items()},
+            sender=sender,
+            receiver=receiver,
+            type=data["type"],
+            user_id=data["user_id"],
+            timestamp=data["timestamp"],
+            summary_method=data["summary_method"],
+            settings=data.get("settings", {}),
+            groupchat_config=data.get("groupchat_config", {}),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+        )
+
+    def add_agent_child(self, agent_name: str, agent: "AgentBaseModel"):
+        self.agent_children[agent_name] = agent
+
+    @classmethod
     def create_workflow(cls, workflow_name: str) -> "WorkflowBaseModel":
         if DEBUG:
             print(f"Creating workflow {workflow_name}")
@@ -670,7 +691,6 @@ class WorkflowBaseModel:
         workflow = cls(
             name=workflow_name,
             description=st.session_state.current_project.prompt if st.session_state.current_project else "This workflow is used for general purpose tasks.",
-            agents=[],
             sender=Sender(
                 type="userproxy",
                 config={
@@ -774,28 +794,6 @@ class WorkflowBaseModel:
             yaml.dump(workflow_data, file)
 
         return workflow
-
-    
-    @classmethod
-    def from_dict(cls, data: Dict):
-        sender = Sender.from_dict(data["sender"])
-        receiver = Receiver.from_dict(data["receiver"])
-        return cls(
-            id=data.get("id"),
-            name=data["name"],
-            description=data["description"],
-            agents=[AgentBaseModel.from_dict(agent) for agent in data.get("agents", [])],
-            sender=sender,
-            receiver=receiver,
-            type=data["type"],
-            user_id=data["user_id"],
-            timestamp=data["timestamp"],
-            summary_method=data["summary_method"],
-            settings=data.get("settings", {}),
-            groupchat_config=data.get("groupchat_config", {}),
-            created_at=data.get("created_at"),
-            updated_at=data.get("updated_at"),
-        )
     
 
     @classmethod
@@ -961,7 +959,7 @@ def handle_agent_close():
         print("handle_agent_close()")
     st.session_state.current_agent = None
     st.session_state.agent_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_ai_agent_creation():
@@ -1058,7 +1056,7 @@ def handle_agent_selection():
             agent = AgentBaseModel.from_dict(agent_data)
             AgentBaseModel.create_agent(agent_name, agent)
             st.session_state.current_agent = agent
-            st.session_state.agent_dropdown = agent_name
+            st.session_state.agent_dropdown = agent_name    
     elif selected_agent == "Create with AI...":
         # Clear the current agent selection
         st.session_state.current_agent = None
@@ -1141,7 +1139,7 @@ def handle_project_close():
     # Close the current workflow
     handle_workflow_close()
     
-    st.rerun()
+    # st.rerun()
 
 
 def handle_project_delete():
@@ -1213,15 +1211,8 @@ def handle_project_selection():
         project = ProjectBaseModel.get_project(selected_project)
         st.session_state.current_project = project
 
-        # Check if the specified workflow exists and load it
-        if project.workflows:
-            workflow_name = project.workflows[0]
-            try:
-                workflow = WorkflowBaseModel.get_workflow(workflow_name)
-                st.session_state.current_workflow = workflow
-                st.session_state.workflow_dropdown = workflow_name
-            except FileNotFoundError:
-                st.warning(f"Workflow '{workflow_name}' not found for project '{project.name}'.")
+        # Load the workflows for the selected project
+        st.session_state.current_project.workflows = project.workflows
 
 
 def handle_project_status_change():
@@ -1437,7 +1428,7 @@ def handle_tool_close():
         print("handle_tool_close()")
     st.session_state.current_tool = None
     st.session_state.tool_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_tool_property_change():
@@ -1528,7 +1519,7 @@ def handle_workflow_close():
         print("called handle_workflow_close()")
     st.session_state.current_workflow = None
     st.session_state.workflow_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_workflow_delete(workflow_file):
@@ -1564,10 +1555,8 @@ def handle_workflow_name_change():
         
         # Update the workflow name in current_project.workflows
         if st.session_state.current_project and old_workflow_name in st.session_state.current_project.workflows:
-            index = st.session_state.current_project.workflows.index(old_workflow_name)
-            st.session_state.current_project.workflows[index] = new_workflow_name
+            st.session_state.current_project.workflows[new_workflow_name] = st.session_state.current_project.workflows.pop(old_workflow_name)
             update_project()
-        
         update_workflow()
 
 
@@ -1583,7 +1572,6 @@ def handle_workflow_selection():
             workflow = WorkflowBaseModel(
                 name=workflow_name,
                 description="This workflow is used for general purpose tasks.",
-                agents=[],
                 sender=Sender(
                     type="userproxy",
                     config={
@@ -1622,7 +1610,7 @@ def handle_workflow_selection():
                     tools=[
                         {
                             "title": "fetch_web_content",
-                            "content": "from typing import Optional\nimport requests\nimport collections\ncollections.Callable = collections.abc.Callable\nfrom bs4 import BeautifulSoup\n\ndef fetch_web_content(url: str) -> Optional[str]:\n    \"\"\"\n    Fetches the text content from a website.\n\n    Args:\n        url (str): The URL of the website.\n\n    Returns:\n        Optional[str]: The content of the website.\n    \"\"\"\n    try:\n        # Send a GET request to the URL\n        response = requests.get(url)\n\n        # Check for successful access to the webpage\n        if response.status_code == 200:\n            # Parse the HTML content of the page using BeautifulSoup\n            soup = BeautifulSoup(response.text, \"html.parser\")\n\n            # Extract the content of the <body> tag\n            body_content = soup.body\n\n            if body_content:\n                # Return all the text in the body tag, stripping leading/trailing whitespaces\n                return \" \".join(body_content.get_text(strip=True).split())\n            else:\n                # Return None if the <body> tag is not found\n                return None\n        else:\n            # Return None if the status code isn't 200 (success)\n            return None\n    except requests.RequestException:\n        # Return None if any request-related exception is caught\n        return None",
+                            "content": "...",  # Omitted for brevity
                             "file_name": "fetch_web_content.json",
                             "description": None,
                             "timestamp": "2024-05-14T08:19:12.425322",
@@ -1654,11 +1642,11 @@ def handle_workflow_selection():
                         },
                         "human_input_mode": "NEVER",
                         "max_consecutive_auto_reply": 30,
-                        "system_message": "You are a helpful AI assistant. Solve tasks using your coding and language skills. In the following cases, suggest python code (in a python coding block) or shell script (in a sh coding block) for the user to execute. 1. When you need to collect info, use the code to output the info you need, for example, browse or search the web, download/read a file, print the content of a webpage or a file, get the current date/time, check the operating system. After sufficient info is printed and the task is ready to be solved based on your language skill, you can solve the task by yourself. 2. When you need to perform some task with code, use the code to perform the task and output the result. Finish the task smartly. Solve the task step by step if you need to. If a plan is not provided, explain your plan first. Be clear which step uses code, and which step uses your language skill. When using code, you must indicate the script type in the code block. The user cannot provide any other feedback or perform any other action beyond executing the code you suggest. The user can't modify your code. So do not suggest incomplete code which requires users to modify. Don't use a code block if it's not intended to be executed by the user. If you want the user to save the code in a file before executing it, put # filename: <filename> inside the code block as the first line. Don't include multiple code blocks in one response. Do not ask users to copy and paste the result. Instead, use 'print' function for the output when relevant. Check the execution result returned by the user. If the result indicates there is an error, fix the error and output the code again. Suggest the full code instead of partial code or code changes. If the error can't be fixed or if the task is not solved even after the code is executed successfully, analyze the problem, revisit your assumption, collect additional info you need, and think of a different approach to try. When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible. Reply 'TERMINATE' in the end when everything is done.",
+                        "system_message": "...",  # Omitted for brevity
                         "is_termination_msg": None,
                         "code_execution_config": None,
                         "default_auto_reply": "",
-                        "description": "A primary assistant agent that writes plans and code to solve tasks. booger"
+                        "description": "A primary assistant agent that writes plans and code to solve tasks."
                     },
                     groupchat_config={},
                     timestamp=datetime.now().isoformat(),
@@ -1666,7 +1654,7 @@ def handle_workflow_selection():
                     tools=[
                         {
                             "title": "fetch_web_content",
-                            "content": "from typing import Optional\nimport requests\nimport collections\ncollections.Callable = collections.abc.Callable\nfrom bs4 import BeautifulSoup\n\ndef fetch_web_content(url: str) -> Optional[str]:\n    \"\"\"\n    Fetches the text content from a website.\n\n    Args:\n        url (str): The URL of the website.\n\n    Returns:\n        Optional[str]: The content of the website.\n    \"\"\"\n    try:\n        # Send a GET request to the URL\n        response = requests.get(url)\n\n        # Check for successful access to the webpage\n        if response.status_code == 200:\n            # Parse the HTML content of the page using BeautifulSoup\n            soup = BeautifulSoup(response.text, \"html.parser\")\n\n            # Extract the content of the <body> tag\n            body_content = soup.body\n\n            if body_content:\n                # Return all the text in the body tag, stripping leading/trailing whitespaces\n                return \" \".join(body_content.get_text(strip=True).split())\n            else:\n                # Return None if the <body> tag is not found\n                return None\n        else:\n            # Return None if the status code isn't 200 (success)\n            return None\n    except requests.RequestException:\n        # Return None if any request-related exception is caught\n        return None",
+                            "content": "...",  # Omitted for brevity
                             "file_name": "fetch_web_content.json",
                             "description": None,
                             "timestamp": "2024-05-14T08:19:12.425322",
@@ -1686,7 +1674,7 @@ def handle_workflow_selection():
 
             # Add the created workflow's name to current_project.workflows
             if st.session_state.current_project:
-                st.session_state.current_project.workflows = [workflow_name] + st.session_state.current_project.workflows[1:]
+                st.session_state.current_project.workflows[workflow_name] = workflow
                 update_project()
     else:
         print ("Selected workflow: ", selected_workflow)
@@ -1695,7 +1683,7 @@ def handle_workflow_selection():
 
         # Update current_project.workflows to reflect the selected workflow
         if st.session_state.current_project:
-            st.session_state.current_project.workflows = [selected_workflow] + [wf for wf in st.session_state.current_project.workflows if wf != selected_workflow]
+            st.session_state.current_project.workflows[selected_workflow] = workflow
             update_project()
 
 
@@ -2148,6 +2136,18 @@ def display_agent_properties():
     agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
     agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
 
+def display_sidebar_agents():
+    if DEBUG:
+        print("display_sidebar_agents()")
+    # Display each agent in the sidebar as a button with the agent's name on it
+    agent_names = AgentBaseModel.load_agents()
+    for agent_name in agent_names:
+        if st.sidebar.button(agent_name):
+            st.write(f"Speaking to agent: {agent_name}")
+        
+
+
+
 ```
 
 # utils\display_debug_util.py
@@ -2227,6 +2227,22 @@ def display_debug():
                     st.write(f"```\n{value}\n```")
 ```
 
+# utils\display_discussion_util.py
+
+```python
+# display_discussion_util.py
+
+import streamlit as st
+
+from configs.config_local import DEBUG
+
+def display_discussion():
+    if DEBUG:
+        print("called display_discussion()")
+    st.text_area("Agent", height=400)
+    st.text_input("User")
+```
+
 # utils\display_files_util.py
 
 ```python
@@ -2290,10 +2306,11 @@ from configs.config_local import DEBUG
 
 from utils.display_agent_util import display_agent_dropdown, display_agent_properties
 from utils.display_debug_util import display_debug
+from utils.display_discussion_util import display_discussion
 from utils.display_files_util import display_files
 from utils.display_project_util import display_project_dropdown, display_project_timestamps, display_project_properties
 from utils.display_settings_util import display_settings
-from utils.display_sidebar_util import display_sidebar_message, display_sidebar_prompt_reengineer
+from utils.display_sidebar_util import display_sidebar
 from utils.display_tool_util import (display_tool_dropdown, display_tool_properties)
 from utils.display_workflow_util import display_workflow_dropdown, display_workflow_properties, display_workflow_timestamps
 
@@ -2305,7 +2322,7 @@ def display_main():
     with open("styles.css") as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     
-    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management"])
+    projectTab, workflowTab, agentTab, toolTab, settingsTab, debugTab, filesTab, discussionTab = st.tabs(["Project", "Workflows", "Agents", "Tools", "Settings", "Debug", "File Management", "Discussion"])
 
 #   PROJECTS
     with projectTab:
@@ -2352,11 +2369,14 @@ def display_main():
     with filesTab:
         display_files()
 
+    with discussionTab:
+        display_discussion()
+
 
 #   SIDEBAR
 def sidebar_begin():
-    display_sidebar_message()
-    display_sidebar_prompt_reengineer()
+    display_sidebar()
+    
 ```
 
 # utils\display_project_util.py
@@ -2416,10 +2436,9 @@ def display_project_properties(project):
         print("display_project_properties()")
     # Display the properties of the current project
     if st.session_state.current_project is not None:
-        # Display the name of the first element in the project.workflows array
-        if len(st.session_state.current_project.workflows) > 0:
-            workflow = st.session_state.current_project.workflows[0]
-            st.write(f"<div class='workflow-name'>Workflow: {workflow}</div>", unsafe_allow_html=True)
+        st.write("Workflows:")
+        for workflow_name, workflow in project.workflows.items():
+            st.write(f"- {workflow_name}")
         project.prompt = st.text_area("Prompt:", value=project.prompt, key="prompt", on_change=handle_prompt_change)
         project.description = st.text_area("Description:", value=project.description or "", key="project_description", on_change=handle_project_description_change)
         status_options = [status.value for status in ProjectStatus]
@@ -2540,16 +2559,32 @@ from configs.config_local import DEBUG
 from event_handlers.event_handlers_prompt import handle_prompt
 from event_handlers.event_handlers_shared import update_project
 from event_handlers.event_handlers_workflow import update_workflow
+from utils.display_agent_util import display_sidebar_agents
 
 
-def display_sidebar_message():
+def display_sidebar():
     if DEBUG:
         print("display_sidebar_message()")
+  
+    selected_tab = st.sidebar.selectbox("Select a tab:", ["Home", "Prompt", "Agents", "Tools"])
+        
+    if selected_tab == "Home":    
+        display_sidebar_home()
+    elif selected_tab == "Prompt":
+        display_sidebar_prompt_reengineer()
+    elif selected_tab == "Agents":
+        display_sidebar_agents()
+    else:
+        st.write("Content for Tab 3")
+
+    st.sidebar.image('gfx/AutoGroqLogo_sm.png')
+    
+
+def display_sidebar_home():
     st.sidebar.write("<div class='teeny'>Need agents right frickin' now? : <a href='https://autogroq.streamlit.app/'>https://autogroq.streamlit.app/</a></div><p/>", unsafe_allow_html=True)
-    st.sidebar.write("<div class='title'>AutoGrok™ <br/> </div>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>Universal AI Agents Made Easy. <br/> Theoretically.</div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>We're putting the 'mental' in 'experimental'.</div>", unsafe_allow_html=True)
-    st.sidebar.write("<div class='teeny'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)
+    st.sidebar.write("<div class='teeny yellow'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)  
 
 
 def display_sidebar_prompt_reengineer():
@@ -2703,10 +2738,10 @@ def display_workflow_properties(workflow):
 
         # Add more workflow properties as needed
 
-        # Display agents, sender, and receiver information
+        # Display agent children
         st.write("Agents:")
-        for agent in workflow.agents:
-            st.write(f"- {agent.name}")
+        for agent_name, agent in workflow.agent_children.items():
+            st.write(f"- {agent_name}")
 
         with st.container(border=True):
             st.write("Sender:")
@@ -2731,1188 +2766,127 @@ def display_workflow_timestamps(workflow):
 
 ```
 
-# tools\py\document_indexer.py
-
-```python
-#  Thanks to MADTANK:  https://github.com/madtank
-#  README:  https://github.com/madtank/autogenstudio-skills/blob/main/rag/README.md
-
-import argparse
-import bs4
-import csv
-import json
-import os
-import pickle
-import re
-import traceback
-from typing import Dict, List, Literal, Tuple
-
-try:
-    import tiktoken
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    from langchain_community.vectorstores import FAISS
-except ImportError:
-    raise ImportError("Please install the dependencies first.")
-
-
-def chunk_str_overlap(
-    s: str,
-    separator: chr = "\n",
-    num_tokens: int = 64,
-    step_tokens: int = 64,
-    encoding: tiktoken.Encoding = None,
-) -> List[str]:
-    """
-    Split a string into chunks with overlap
-    :param s: the input string
-    :param separator: the separator to split the string
-    :param num_tokens: the number of tokens in each chunk
-    :param step_tokens: the number of tokens to step forward
-    :param encoding: the encoding to encode the string
-    """
-    assert step_tokens <= num_tokens, (
-        f"The number of tokens {num_tokens} in each chunk " f"should be larger than the step size {step_tokens}."
-    )
-
-    lines = s.split(separator)
-    chunks = dict()
-    final_chunks = []
-
-    if len(lines) == 0:
-        return []
-
-    first_line = lines[0]
-    first_line_size = len(encoding.encode(first_line))
-
-    chunks[0] = [first_line, first_line_size]
-
-    this_step_size = first_line_size
-
-    for i in range(1, len(lines)):
-        line = lines[i]
-        line_size = len(encoding.encode(line))
-
-        to_pop = []
-        for key in chunks:
-            if chunks[key][1] + line_size > num_tokens:
-                to_pop.append(key)
-            else:
-                chunks[key][0] += f"{separator}{line}"
-                chunks[key][1] += line_size
-        final_chunks += [chunks.pop(key)[0] for key in to_pop]
-
-        if this_step_size + line_size > step_tokens:
-            chunks[i] = [line, line_size]
-            this_step_size = 0
-        this_step_size += line_size
-
-    max_remained_chunk = ""
-    max_remained_chunk_size = 0
-    for key in chunks:
-        if chunks[key][1] > max_remained_chunk_size:
-            max_remained_chunk_size = chunks[key][1]
-            max_remained_chunk = chunks[key][0]
-    if max_remained_chunk_size > 0:
-        final_chunks.append(max_remained_chunk)
-
-    return final_chunks
-
-
-def get_title(
-    file_name: str,
-    prop="title: ",
-) -> str:
-    """
-    Get the title of a file
-    :param file_name: the file name
-    :param prop: the property to get the title
-    """
-    with open(file_name, encoding="utf-8", errors="ignore") as f_in:
-        for line in f_in:
-            line = line.strip()
-            if line and (line.startswith(prop) or any([c.isalnum() for c in line])):
-                return line
-    return ""
-
-
-def extract_text_from_file(
-    file: str,
-    file_type: Literal["pdf", "docx", "csv", "pptx"],
-) -> Tuple[str, str]:
-    """
-    Extract text from a file in pdf, docx, csv or pptx format
-    :param file: the file path
-    :param file_type: the extension of the file
-    """
-    if file_type == "pdf":
-        try:
-            from pypdf import PdfReader
-        except ImportError:
-            raise ImportError("Please install pypdf first.")
-        # Extract text from pdf using PyPDF2
-        reader = PdfReader(file)
-        extracted_text = " ".join([page.extract_text() for page in reader.pages])
-        title = extracted_text.split("\n")[0]
-    elif file_type == "docx":
-        try:
-            import docx2txt
-        except ImportError:
-            raise ImportError("Please install docx2txt first.")
-        # Extract text from docx using docx2txt
-        extracted_text = docx2txt.process(file)
-        title = extracted_text.split("\n")[0]
-    elif file_type == "csv":
-        # Extract text from csv using csv module
-        extracted_text = ""
-        title = ""
-        reader = csv.reader(file)
-        for row in reader:
-            extracted_text += " ".join(row) + "\n"
-    elif file_type == "pptx":
-        try:
-            import pptx
-        except ImportError:
-            raise ImportError("Please install python-pptx first.")
-        extracted_text = ""
-        no_title = True
-        title = ""
-        presentation = pptx.Presentation(file)
-        for slide in presentation.slides:
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs:
-                        for run in paragraph.runs:
-                            extracted_text += run.text + " "
-                            if no_title and len(run.text) > 10:
-                                title = run.text
-                                no_title = False
-                    extracted_text += "\n"
-    else:
-        # Unsupported file type
-        raise ValueError(f"Unsupported file type: {file_type}")
-
-    return title[:100], extracted_text
-
-
-def text_parser(
-    read_file: str,
-) -> Tuple[str, str]:
-    """
-    Returns the title, parsed text and a BeautifulSoup object with different file extension
-    : param read_file: the input file with a given extension
-    : return: the title, parsed text and a BeautifulSoup object, the BeautifulSoup object is used to get the document
-        link from the html files
-    """
-    filename, extension = os.path.splitext(read_file)
-    extension = extension.lstrip(".")
-    title = filename
-    soup = None
-    supported_extensions = ["md", "markdown", "html", "htm", "txt", "json", "jsonl"]
-    other_extensions = ["docx", "pptx", "pdf", "csv"]
-
-    # utf-8-sig will treat BOM header as a metadata of a file not a part of the file content
-    default_encoding = "utf-8-sig"
-
-    if extension in ("md", "markdown", "txt"):
-        title = get_title(read_file)
-        with open(read_file, "r", encoding=default_encoding, errors="ignore") as f:
-            text = f.read()
-    elif extension in ("html", "htm"):
-        from bs4 import BeautifulSoup
-
-        with open(read_file, "r", encoding=default_encoding, errors="ignore") as f:
-            soup = BeautifulSoup(f, "html.parser")
-        title = next(soup.stripped_strings)[:100]
-        text = soup.get_text("\n")
-    # read json/jsonl file in and convert each json to a row of string
-    elif extension in ("json", "jsonl"):
-        try:
-            with open(read_file, "r", encoding=default_encoding, errors="ignore") as f:
-                data = json.load(f) if extension == "json" else [json.loads(line) for line in f]
-        except:
-            # json file encoding issue, skip this file
-            return title, ""
-
-        if isinstance(data, dict):
-            text = json.dumps(data)
-        elif isinstance(data, list):
-            content_list = [json.dumps(each_json) for each_json in data]
-            text = "\n".join(content_list)
-            title = filename
-    elif extension in other_extensions:
-        title, text = extract_text_from_file(read_file, extension)
-    else:  # no support for other format
-        print(
-            f"Not support for file with extension: {extension}. "
-            f"The supported extensions are {supported_extensions}",
-        )
-        return title, ""
-
-    output_text = re.sub(r"\n{3,}", "\n\n", text)
-    # keep whitespaces for formatting
-    output_text = re.sub(r"-{3,}", "---", output_text)
-    output_text = re.sub(r"\*{3,}", "***", output_text)
-    output_text = re.sub(r"_{3,}", "___", output_text)
-
-    return title, output_text
-
-
-def chunk_document(
-    doc_path: str,
-    chunk_size: int,
-    chunk_step: int,
-) -> Tuple[int, List[str], List[Dict[str, str]], Dict[str, int]]:
-    """
-    Split documents into chunks
-    :param doc_path: the path of the documents
-    :param chunk_size: the size of the chunk
-    :param chunk_step: the step size of the chunk
-    """
-    texts = []
-    metadata_list = []
-    file_count = 0
-    chunk_id_to_index = dict()
-
-    enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
-
-    # traverse all files under dir
-    print("Split documents into chunks...")
-    for root, dirs, files in os.walk(doc_path):
-        for name in files:
-            f = os.path.join(root, name)
-            print(f"Reading {f}")
-            try:
-                title, content = text_parser(f)
-                file_count += 1
-                if file_count % 100 == 0:
-                    print(f"{file_count} files read.")
-
-                if len(content) == 0:
-                    continue
-
-                chunks = chunk_str_overlap(
-                    content.strip(),
-                    num_tokens=chunk_size,
-                    step_tokens=chunk_step,
-                    separator="\n",
-                    encoding=enc,
-                )
-                source = os.path.sep.join(f.split(os.path.sep)[4:])
-                for i in range(len(chunks)):
-                    # custom metadata if needed
-                    metadata = {
-                        "source": source,
-                        "title": title,
-                        "chunk_id": i,
-                    }
-                    chunk_id_to_index[f"{source}_{i}"] = len(texts) + i
-                    metadata_list.append(metadata)
-                texts.extend(chunks)
-            except Exception as e:
-                print(f"Error encountered when reading {f}: {traceback.format_exc()} {e}")
-    return file_count, texts, metadata_list, chunk_id_to_index
-
-
-if __name__ == "__main__":
-    # parse arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-d",
-        "--doc_path",
-        help="the path of the documents",
-        type=str,
-        default="documents",
-    )
-    parser.add_argument(
-        "-c",
-        "--chunk_size",
-        help="the size of the chunk",
-        type=int,
-        default=64,
-    )
-    parser.add_argument(
-        "-s",
-        "--chunk_step",
-        help="the step size of the chunk",
-        type=int,
-        default=64,
-    )
-    parser.add_argument(
-        "-o",
-        "--output_path",
-        help="the path of the output",
-        type=str,
-        default="knowledge",
-    )
-    args = parser.parse_args()
-
-    file_count, texts, metadata_list, chunk_id_to_index = chunk_document(
-        doc_path=args.doc_path,
-        chunk_size=args.chunk_size,
-        chunk_step=args.chunk_step,
-    )
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    vectorstore = FAISS.from_texts(
-        texts=texts,
-        metadatas=metadata_list,
-        embedding=embeddings,
-    )
-    vectorstore.save_local(folder_path=args.output_path)
-    with open(os.path.join(args.output_path, "chunk_id_to_index.pkl"), "wb") as f:
-        pickle.dump(chunk_id_to_index, f)
-    print(f"Saved vectorstore to {args.output_path}")
-```
-
-# tools\py\document_retriever.py
-
-```python
-# #  Thanks to MADTANK:  https://github.com/madtank
-# #  README:  https://github.com/madtank/autogenstudio-skills/blob/main/rag/README.md
-
-# import os
-# import pickle
-# import json
-# import argparse
-
-# try:
-#     import tiktoken
-#     from langchain_community.embeddings import HuggingFaceEmbeddings
-#     from langchain_community.vectorstores import FAISS
-# except ImportError:
-#     raise ImportError("Please install langchain-community first.")
-
-# # Configuration - Users/AI skill developers must update this path to their specific index folder
-# # To test with sample data set index_folder to "knowledge"
-# CONFIG = {
-#     "index_folder": "rag/knowledge",  # TODO: Update this path before using
-# }
-
-# class DocumentRetriever:
-#     def __init__(self, index_folder):
-#         self.index_folder = index_folder
-#         self.vectorstore = None
-#         self.chunk_id_to_index = None
-#         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-#         self._init()
-#         self.enc = tiktoken.encoding_for_model("gpt-3.5-turbo")
-
-#     def _init(self):
-#         self.vectorstore = FAISS.load_local(
-#             folder_path=self.index_folder,
-#             embeddings=self.embeddings,
-#         )
-#         with open(os.path.join(self.index_folder, "chunk_id_to_index.pkl"), "rb") as f:
-#             self.chunk_id_to_index = pickle.load(f)
-
-#     def __call__(self, query: str, size: int = 5, target_length: int = 256):
-#         if self.vectorstore is None:
-#             raise Exception("Vectorstore not initialized")
-
-#         result = self.vectorstore.similarity_search(query=query, k=size)
-#         expanded_chunks = self.do_expand(result, target_length)
-
-#         return json.dumps(expanded_chunks, indent=4)
-
-#     def do_expand(self, result, target_length):
-#         expanded_chunks = []
-#         # do expansion
-#         for r in result:
-#             source = r.metadata["source"]
-#             chunk_id = r.metadata["chunk_id"]
-#             content = r.page_content
-
-#             expanded_result = content
-#             left_chunk_id, right_chunk_id = chunk_id - 1, chunk_id + 1
-#             left_valid, right_valid = True, True
-#             chunk_ids = [chunk_id]
-#             while True:
-#                 current_length = len(self.enc.encode(expanded_result))
-#                 if f"{source}_{left_chunk_id}" in self.chunk_id_to_index:
-#                     chunk_ids.append(left_chunk_id)
-#                     left_chunk_index = self.vectorstore.index_to_docstore_id[
-#                         self.chunk_id_to_index[f"{source}_{left_chunk_id}"]
-#                     ]
-#                     left_chunk = self.vectorstore.docstore.search(left_chunk_index)
-#                     encoded_left_chunk = self.enc.encode(left_chunk.page_content)
-#                     if len(encoded_left_chunk) + current_length < target_length:
-#                         expanded_result = left_chunk.page_content + expanded_result
-#                         left_chunk_id -= 1
-#                         current_length += len(encoded_left_chunk)
-#                     else:
-#                         expanded_result += self.enc.decode(
-#                             encoded_left_chunk[-(target_length - current_length) :],
-#                         )
-#                         current_length = target_length
-#                         break
-#                 else:
-#                     left_valid = False
-
-#                 if f"{source}_{right_chunk_id}" in self.chunk_id_to_index:
-#                     chunk_ids.append(right_chunk_id)
-#                     right_chunk_index = self.vectorstore.index_to_docstore_id[
-#                         self.chunk_id_to_index[f"{source}_{right_chunk_id}"]
-#                     ]
-#                     right_chunk = self.vectorstore.docstore.search(right_chunk_index)
-#                     encoded_right_chunk = self.enc.encode(right_chunk.page_content)
-#                     if len(encoded_right_chunk) + current_length < target_length:
-#                         expanded_result += right_chunk.page_content
-#                         right_chunk_id += 1
-#                         current_length += len(encoded_right_chunk)
-#                     else:
-#                         expanded_result += self.enc.decode(
-#                             encoded_right_chunk[: target_length - current_length],
-#                         )
-#                         current_length = target_length
-#                         break
-#                 else:
-#                     right_valid = False
-
-#                 if not left_valid and not right_valid:
-#                     break
-
-#             expanded_chunks.append(
-#                 {
-#                     "chunk": expanded_result,
-#                     "metadata": r.metadata,
-#                     # "length": current_length,
-#                     # "chunk_ids": chunk_ids
-#                 },
-#             )
-#         return expanded_chunks
-
-# # Example Usage
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description='Retrieve documents based on a query.')
-#     parser.add_argument('query', nargs='?', type=str, help='The query to retrieve documents for.')
-#     args = parser.parse_args()
-
-#     if not args.query:
-#         parser.print_help()
-#         print("Error: No query provided.")
-#         exit(1)
-
-#     # Ensure the index_folder path is correctly set in CONFIG before proceeding
-#     index_folder = CONFIG["index_folder"]
-#     if index_folder == "path/to/your/knowledge/directory":
-#         print("Error: Index folder in CONFIG has not been set. Please update it to your index folder path.")
-#         exit(1)
-
-#     # Instantiate and use the DocumentRetriever with the configured index folder
-#     retriever = DocumentRetriever(index_folder=index_folder)
-#     query = args.query
-#     size = 5  # Number of results to retrieve
-#     target_length = 256  # Target length of expanded content
-#     results = retriever(query, size, target_length)
-#     print(results)
-```
-
-# tools\py\fetch_web_content.py
-
-```python
-#  Thanks to MADTANK:  https://github.com/madtank
-
-from typing import Optional
-import requests
-import collections
-collections.Callable = collections.abc.Callable
-from bs4 import BeautifulSoup
-
-def fetch_web_content(url: str) -> Optional[str]:
-    """
-    Fetches the text content from a website.
-
-    Args:
-        url (str): The URL of the website.
-
-    Returns:
-        Optional[str]: The content of the website.
-    """
-    try:
-        # Send a GET request to the URL
-        response = requests.get(url)
-
-        # Check for successful access to the webpage
-        if response.status_code == 200:
-            # Parse the HTML content of the page using BeautifulSoup
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Extract the content of the <body> tag
-            body_content = soup.body
-
-            if body_content:
-                # Return all the text in the body tag, stripping leading/trailing whitespaces
-                return " ".join(body_content.get_text(strip=True).split())
-            else:
-                # Return None if the <body> tag is not found
-                return None
-        else:
-            # Return None if the status code isn't 200 (success)
-            return None
-    except requests.RequestException:
-        # Return None if any request-related exception is caught
-        return None
-```
-
-# tools\py\generate_sd_images.py
-
-```python
-# Thanks to marc-shade:  https://github.com/marc-shade
-# Ollama only?  -jjg
-
-from typing import List
-import json
-import requests
-import io
-import base64
-from PIL import Image
-from pathlib import Path
-import uuid # Import the uuid library
-
-# Format: protocol://server:port
-base_url = "http://0.0.0.0:7860"
-
-def generate_sd_images(query: str, image_size: str = "512x512", team_name: str = "default") -> List[str]:
-    """
-    Function to paint, draw or illustrate images based on the users query or request. 
-    Generates images locally with the automatic1111 API and saves them to disk.  
-    Use the code below anytime there is a request to create an image.
-
-    :param query: A natural language description of the image to be generated.
-    :param image_size: The size of the image to be generated. (default is "512x512")
-    :param team_name: The name of the team to associate the image with.
-    :return: A list containing a single filename for the saved image.
-    """
-    # Split the image size string at "x"
-    parts = image_size.split("x")
-    image_width = parts[0]
-    image_height = parts[1]
-
-    # list of file paths returned to AutoGen
-    saved_files = []
-
-    payload = {
-        "prompt": query,
-        "steps": 40,
-        "cfg_scale": 7,
-        "denoising_strength": 0.5,
-        "sampler_name": "DPM++ 2M Karras",
-        "n_iter": 1,
-        "batch_size": 1, # Ensure only one image is generated per batch
-        "override_settings": {
-             'sd_model_checkpoint': "starlightAnimated_v3",
-        }
-    }
-
-    api_url = f"{base_url}/sdapi/v1/txt2img"
-    response = requests.post(url=api_url, json=payload)
-
-    if response.status_code == 200:
-        r = response.json()
-        # Access only the final generated image (index 0)
-        encoded_image = r['images'][0] 
-
-        image = Image.open(io.BytesIO(base64.b64decode(encoded_image.split(",", 1)[0])))
-        
-        # --- Generate a unique filename with team name and UUID ---
-        unique_id = str(uuid.uuid4())[:8] # Get a short UUID
-        file_name = f"images/{team_name}_{unique_id}_output.png"
-        
-        file_path = Path(file_name)
-        image.save(file_path)
-        print(f"Image saved to {file_path}")
-
-        saved_files.append(str(file_path))
-    else:
-        print(f"Failed to download the image from {api_url}")
-
-    return saved_files
-```
-
-# tools\py\get_complementary_colors.py
-
-```python
-# Tool filename: complementary_colors.py
-# Import necessary module(s)
-import colorsys
-
-def get_complementary_colors(color):
-    # docstrings
-    """
-    Returns a list of complementary colors for the given color.
-
-    Parameters:
-    color (str): The color in hexadecimal format (e.g., '#FF0000' for red).
-
-    Returns:
-    list: A list of complementary colors in hexadecimal format.
-    """
-
-    # Body of tool
-    # Convert the color from hexadecimal to RGB
-    r, g, b = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-    # Convert RGB to HSV
-    h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
-    # Calculate the complementary hue
-    h_compl = (h + 0.5) % 1
-    # Convert the complementary hue back to RGB
-    r_compl, g_compl, b_compl = colorsys.hsv_to_rgb(h_compl, 1, 1)
-    # Convert RGB to hexadecimal
-    color_compl = '#{:02x}{:02x}{:02x}'.format(int(r_compl*255), int(g_compl*255), int(b_compl*255))
-    # Return the complementary color
-    return [color_compl]
-
-    # Example usage:
-    # color = '#FF0000'
-    # print(get_complementary_colors(color))
-```
-
-# tools\py\get_weather.py
-
-```python
-import requests
-from typing import Optional
-
-def get_weather(zipcode: str, api_key: str) -> Optional[dict]:
-    """
-    Fetches the current weather for the given ZIP code using the OpenWeatherMap API.
-
-    Args:
-        zipcode (str): The ZIP code for which to fetch the weather.
-        api_key (str): Your OpenWeatherMap API key.
-
-    Returns:
-        Optional[dict]: A dictionary containing the weather information, or None if an error occurs.
-    """
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        "zip": zipcode,
-        "appid": api_key,
-        "units": "imperial"  # Use "metric" for Celsius
-    }
-    
-    try:
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()  # Raise an HTTPError for bad responses
-        return response.json()
-    except requests.RequestException as e:
-        print(f"An error occurred: {e}")
-        return None
-
-# Example usage:
-# api_key = "your_openweathermap_api_key"
-# weather = get_weather("94040", api_key)
-# print(weather)
-
-```
-
-# tools\py\plot_diagram.py
-
-```python
-#  Thanks to MADTANK:  https://github.com/madtank
-
-import os
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
-# Function to draw the geometric structure with customizable file name
-def draw_geometric_structure(file_name, base_circles=4, base_circle_color='blue', top_circle_color='orange', line_color='grey', line_width=2):
-
-    # Define the directory and save path using the file_name parameter
-    directory = 'diagrams'
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    save_path = f'{directory}/{file_name}.png'
-    
-    fig, ax = plt.subplots()
-
-    # Draw base circles
-    for i in range(base_circles):
-        circle = patches.Circle((i * 1.5, 0), 0.5, color=base_circle_color)
-        ax.add_patch(circle)
-
-    # Draw top circle
-    top_circle = patches.Circle(((base_circles - 1) * 0.75, 2), 0.6, color=top_circle_color)
-    ax.add_patch(top_circle)
-
-    # Draw lines
-    for i in range(base_circles):
-        line = plt.Line2D([(i * 1.5), ((base_circles - 1) * 0.75)], [0, 2], color=line_color, linewidth=line_width)
-        ax.add_line(line)
-
-    # Set limits and aspect
-    ax.set_xlim(-1, base_circles * 1.5)
-    ax.set_ylim(-1, 3)
-    ax.set_aspect('equal')
-
-    # Remove axes
-    ax.axis('off')
-
-    # Save the plot to the specified path
-    plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
-    plt.close()
-
-    # Return the path for verification
-    return save_path
-
-# Example usage:
-#file_name = 'custom_geometric_structure'
-#image_path = draw_geometric_structure(file_name, base_circles=8, base_circle_color='blue', top_circle_color='orange', line_color='grey', line_width=2)
-```
-
-# tools\py\save_file_to_disk.py
-
-```python
-# Thanks to aj47:  https://github.com/aj47
-
-import os
-
-def save_file_to_disk(contents, file_name):
-    """
-    Saves the given contents to a file with the given file name.
-
-    Parameters:
-    contents (str): The string contents to save to the file.
-    file_name (str): The name of the file, including its extension.
-
-    Returns:
-    str: A message indicating the success of the operation.
-    """
-    # Ensure the directory exists; create it if it doesn't
-    directory = os.path.dirname(file_name)
-    if directory and not os.path.exists(directory):
-        os.makedirs(directory)
-
-    # Write the contents to the file
-    with open(file_name, 'w') as file:
-        file.write(contents)
-    
-    return f"File '{file_name}' has been saved successfully."
-
-# Example usage:
-# contents_to_save = "Hello, world!"
-# file_name = "example.txt"
-# print(save_file_to_disk(contents_to_save, file_name))
-```
-
-# tools\py\slackoverflow_teams.py
-
-```python
-# #  Thanks to MADTANK:  https://github.com/madtank
-# #  README:  https://github.com/madtank/autogenstudio-skills/blob/main/stackoverflow_teams/README.md
-
-# import os
-# import requests
-# import json
-# import sys
-
-# class StackOverflowTeamsSearcher:
-#     def __init__(self):
-#         self.api_key = os.getenv("STACK_OVERFLOW_TEAMS_API_KEY")
-#         if not self.api_key:
-#             raise ValueError("API key not found in environment variables")
-#         self.base_url = "https://api.stackoverflowteams.com/2.3/search"
-#         self.headers = {"X-API-Access-Token": self.api_key}
-
-#     def search(self, query, team_name):
-#         params = {"intitle": query, "team": team_name}
-#         response = requests.get(self.base_url, headers=self.headers, params=params)
-
-#         if response.status_code != 200:
-#             print(f"Error: Received status code {response.status_code}")
-#             print(response.text)
-#             return None
-
-#         try:
-#             data = response.json()
-#             simplified_output = []
-#             for item in data['items']:
-#                 question = {"question": item['title']}
-#                 if 'accepted_answer_id' in item:
-#                     answer_id = item['accepted_answer_id']
-#                     answer_url = f"https://api.stackoverflowteams.com/2.3/answers/{answer_id}"
-#                     answer_params = {"team": team_name, "filter": "withbody"}
-#                     answer_response = requests.get(answer_url, headers=self.headers, params=answer_params)
-#                     if answer_response.status_code == 200:
-#                         answer_data = answer_response.json()
-#                         first_item = answer_data['items'][0]
-#                         if 'body' in first_item:
-#                             answer_text = first_item['body']
-#                             question['answer'] = answer_text
-# #                        else:
-# #                            print(f"Question {item['link']} has no answer body")
-# #                    else:
-# #                        print(f"Error: Received status code {answer_response.status_code}")
-# #                        print(answer_response.text)
-# #                else:
-# #                    print(f"Question {item['link']} has no answer")
-#                 simplified_output.append(question)
-#             return json.dumps(simplified_output, indent=4)  # Pretty-printing
-#         except ValueError as e:
-#             print(f"Error parsing JSON: {e}")
-#             print("Response text:", response.text)
-#             return None
-
-# # Example Usage
-# if __name__ == "__main__":
-#     if len(sys.argv) < 2:
-#         print("Usage: python stackoverflow_teams.py <query>")
-#         sys.exit(1)
-
-#     query = sys.argv[1]
-#     team_name = "yourteamname"  # TODO Set your team name here
-#     # Instantiate and use the StackOverflowTeamsSearcher with the query string passed in
-#     searcher = StackOverflowTeamsSearcher()
-#     results = searcher.search(query, team_name)
-#     print(results)
-```
-
-# tools\py\slack_search.py
-
-```python
-# #  Thanks to MADTANK:  https://github.com/madtank
-# #  README:  https://github.com/madtank/autogenstudio-skills/blob/main/slack/README.md
-
-# import os
-# import requests
-# import json
-# import re
-# import sys
-
-# class SlackSearcher:
-#     def __init__(self):
-#         self.api_token = os.getenv("SLACK_API_TOKEN")
-#         if not self.api_token:
-#             raise ValueError("Slack API token not found in environment variables")
-#         self.base_url = "https://slack.com/api"
-#         self.headers = {"Authorization": f"Bearer {self.api_token}"}
-#         # Replace these example channel names with the actual channel names you want to search
-#         self.channel_names = ["general", "random"]
-
-#     def search(self, query):
-#         query_with_channels = self.build_query_with_channels(query)
-#         search_url = f"{self.base_url}/search.messages"
-#         params = {"query": query_with_channels}
-#         response = requests.get(search_url, headers=self.headers, params=params)
-
-#         if response.status_code != 200:
-#             print(f"Error: Received status code {response.status_code}")
-#             print(response.text)
-#             return None
-
-#         try:
-#             data = response.json()
-#             if not data['ok']:
-#                 print(f"Error: {data['error']}")
-#                 return None
-
-#             simplified_output = []
-#             for message in data['messages']['matches']:
-#                 simplified_message = {
-#                     "user": message['user'],
-#                     "text": message['text'],
-#                     "permalink": message['permalink']
-#                 }
-#                 thread_ts = self.extract_thread_ts(message['permalink'])
-#                 if thread_ts:
-#                     thread_messages = self.get_thread_messages(message['channel']['id'], thread_ts)
-#                     simplified_message['thread'] = thread_messages
-#                 simplified_output.append(simplified_message)
-#             return json.dumps(simplified_output, indent=4)  # Pretty-printing
-#         except ValueError as e:
-#             print(f"Error parsing JSON: {e}")
-#             print("Response text:", response.text)
-#             return None
-
-#     def build_query_with_channels(self, query):
-#         channel_queries = [f"in:{channel}" for channel in self.channel_names]
-#         return f"{query} {' '.join(channel_queries)}"
-
-#     def extract_thread_ts(self, permalink):
-#         match = re.search(r"thread_ts=([0-9.]+)", permalink)
-#         return match.group(1) if match else None
-
-#     def get_thread_messages(self, channel_id, thread_ts):
-#         thread_url = f"{self.base_url}/conversations.replies"
-#         params = {"channel": channel_id, "ts": thread_ts}
-#         response = requests.get(thread_url, headers=self.headers, params=params)
-
-#         if response.status_code != 200 or not response.json()['ok']:
-#             print(f"Error fetching thread messages: {response.text}")
-#             return []
-
-#         thread_messages = []
-#         for message in response.json()['messages']:
-#             if message['ts'] != thread_ts:  # Exclude the parent message
-#                 thread_messages.append({
-#                     "user": message['user'],
-#                     "text": message['text']
-#                 })
-#         return thread_messages
-
-# # Example Usage
-# if __name__ == "__main__":
-#     if len(sys.argv) < 2:
-#         print("Usage: python slack_search.py <query>")
-#         sys.exit(1)
-
-#     query = sys.argv[1]
-#     searcher = SlackSearcher()
-#     results = searcher.search(query)
-#     print(results)
-```
-
-# tools\py\test.py
-
-```python
-# bfrglz; = 
-# return
-
-# import json
-```
-
-# tools\py\webscrape.py
-
-```python
-#  Thanks to MADTANK:  https://github.com/madtank
-
-import requests
-from bs4 import BeautifulSoup
-
-
-def save_webpage_as_text(url, output_filename):
-    # Send a GET request to the URL
-    response = requests.get(url)
-    
-    # Initialize BeautifulSoup to parse the content
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Extract text from the BeautifulSoup object
-    # You can adjust the elements you extract based on your needs
-    text = soup.get_text(separator='\n', strip=True)
-    
-    # Save the extracted text to a file
-    with open(output_filename, 'w', encoding='utf-8') as file:
-        file.write(text)
-    
-    # Return the file path
-    return output_filename
-
-
-# Example usage:
-# url = 'https://j.gravelle.us        /'
-# output_filename = 'webpage_content.txt'
-# file_path = save_webpage_as_text(url, output_filename)
-# print("File saved at:", file_path)
-
-
-# For a list of urls:
-# urls = ['http://example.com', 'http://example.org']
-# for i, url in enumerate(urls):
-#     output_filename = f'webpage_content_{i}.txt'
-#     save_webpage_as_text(url, output_filename)
-```
-
-# tools\py\web_search.py
-
-```python
-# #  Thanks to MADTANK:  https://github.com/madtank
-# #  README:  https://github.com/madtank/autogenstudio-skills/blob/main/web_search/README.MD
-
-# import requests
-# from typing import List, Tuple, Optional
-
-# # Define the structure of a search result entry
-# ResponseEntry = Tuple[str, str, str]
-
-# # Configuration variables for the web search function
-# CONFIG = {
-#     "api_provider": "google",  # or "bing"
-#     "result_count": 3,
-#     # For Google Search enter these values 
-#     # Refer to readme for help:  https://github.com/madtank/autogenstudio-skills/blob/main/web_search/README.MD 
-#     "google_api_key": "your_google_api_key_here",
-#     "google_search_engine_id": "your_google_search_engine_id_here",
-#     # Or Bing Search enter these values
-#     "bing_api_key": "your_bing_api_key_here"
-# }
-
-# class WebSearch:
-#     """
-#     A class that encapsulates the functionality to perform web searches using
-#     Google Custom Search API or Bing Search API based on the provided configuration.
-#     """
-
-#     def __init__(self, config: dict):
-#         """
-#         Initializes the WebSearch class with the provided configuration.
-
-#         Parameters:
-#         - config (dict): A dictionary containing configuration settings.
-#         """
-#         self.config = config
-
-#     def search_query(self, query: str) -> Optional[List[ResponseEntry]]:
-#         """
-#         Performs a web search based on the query and configuration.
-
-#         Parameters:
-#         - query (str): The search query string.
-
-#         Returns:
-#         - A list of ResponseEntry tuples containing the title, URL, and snippet of each result.
-#         """
-#         api_provider = self.config.get("api_provider", "google")
-#         result_count = int(self.config.get("result_count", 3))
-#         try:
-#             if api_provider == "google":
-#                 return self._search_google(query, cnt=result_count)
-#             elif api_provider == "bing":
-#                 return self._search_bing(query, cnt=result_count)
-#         except ValueError as e:
-#             print(f"An error occurred: {e}")
-#         except Exception as e:
-#             print(f"An unexpected error occurred: {e}")
-#         return None
-
-#     def _search_google(self, query: str, cnt: int) -> Optional[List[ResponseEntry]]:
-#         """
-#         Performs a Google search and processes the results.
-#         Parameters:
-#         - query (str): The search query string.
-#         - cnt (int): The number of search results to return.
-
-#         Returns:
-#         - A list of ResponseEntry tuples containing the title, URL, and snippet of each Google search result.
-#         """
-#         api_key = self.config.get("google_api_key")
-#         search_engine_id = self.config.get("google_search_engine_id")
-#         url = f"https://www.googleapis.com/customsearch/v1?key={api_key}&cx={search_engine_id}&q={query}"
-#         if cnt > 0:
-#             url += f"&num={cnt}"
-#         response = requests.get(url)
-#         if response.status_code == 200:
-#             result_list: List[ResponseEntry] = []
-#             for item in response.json().get("items", []):
-#                 result_list.append((item["title"], item["link"], item["snippet"]))
-#             return result_list
-#         else:
-#             print(f"Error with Google Custom Search API: {response.status_code}")
-#             return None
-
-#     def _search_bing(self, query: str, cnt: int) -> Optional[List[ResponseEntry]]:
-#         """
-#         Performs a Bing search and processes the results.
-
-#         Parameters:
-#         - query (str): The search query string.
-#         - cnt (int): The number of search results to return.
-
-#         Returns:
-#         - A list of ResponseEntry tuples containing the name, URL, and snippet of each Bing search result.
-#         """
-#         api_key = self.config.get("bing_api_key")
-#         url = f"https://api.bing.microsoft.com/v7.0/search?q={query}"
-#         if cnt > 0:
-#             url += f"&count={cnt}"
-#         headers = {"Ocp-Apim-Subscription-Key": api_key}
-#         response = requests.get(url, headers=headers)
-#         if response.status_code == 200:
-#             result_list: List[ResponseEntry] = []
-#             for item in response.json().get("webPages", {}).get("value", []):
-#                 result_list.append((item["name"], item["url"], item["snippet"]))
-#             return result_list
-#         else:
-#             print(f"Error with Bing Search API: {response.status_code}")
-#             return None
-
-# # Remember to replace the placeholders in CONFIG with your actual API keys.
-# # Example usage
-# # search = WebSearch(CONFIG)
-# # results = search.search_query("Example Query")
-# # if results is not None:
-# #     for title, link, snippet in results:
-# #         print(title, link, snippet)
-```
-
-# agents\primary_assistant.yaml
+# agents\Accountant.yaml
 
 ```yaml
-type: assistant
+code: "# Agent filename: Accountant.py\nimport json\n\nclass Accountant:\n    \"\"\
+  \"\n    The name of the agent.\n    An agent that performs accounting tasks based\
+  \ on the given request.\n    Methods:\n    create_statement(args): Creates an income\
+  \ statement based on the given parameters.\n    \"\"\"\n\n    def __init__(self,\
+  \ company_info):\n        \"\"\"\n        Initializes the Accountant with the given\
+  \ company information.\n        Parameters:\n        company_info (type): Description\
+  \ of company information.\n        \"\"\"\n        self.company_info = company_info\n\
+  \n    def create_statement(self, income_data):\n        \"\"\"\n        Creates\
+  \ an income statement based on the given income data.\n        Parameters:\n   \
+  \     income_data (type): Description of income data.\n        Returns:\n      \
+  \  income_statement: Description of the return value.\n        \"\"\"\n        #\
+  \ Body of the method\n        # Implement the accounting logic here\n        income_statement\
+  \ = {\n            \"Revenue\": 0,\n            \"Expenses\": 0,\n            \"\
+  Net Income\": 0\n        }\n        # Calculate total revenue\n        total_revenue\
+  \ = sum(income_data[\"revenue\"])\n        # Calculate total expenses\n        total_expenses\
+  \ = sum(income_data[\"expenses\"])\n        # Calculate net income\n        income_statement[\"\
+  Net Income\"] = total_revenue - total_expenses\n        return income_statement\n\
+  \n# Example usage:\n# accountant = Accountant(company_info)\n# income_statement\
+  \ = accountant.create_statement(income_data)\n# print(income_statement)"
 config:
-  name: primary_assistant
-  llm_config:
-    config_list:
-      - user_id: default
-        timestamp: ""
-        model: ""
-        base_url: null
-        api_type: null
-        api_version: null
-        description: OpenAI model configuration
-    temperature: 0.1
-    cache_seed: null
-    timeout: null
-    max_tokens: null
-    extra_body: null
-  human_input_mode: NEVER
-  max_consecutive_auto_reply: 30
-  system_message: |
-    You are a helpful AI assistant. Solve tasks using your coding and language skills. In the following cases, suggest python code (in a python coding block) or shell script (in a sh coding block) for the user to execute. 
-    1. When you need to collect info, use the code to output the info you need, for example, browse or search the web, download/read a file, print the content of a webpage or a file, get the current date/time, check the operating system. After sufficient info is printed and the task is ready to be solved based on your language skill, you can solve the task by yourself. 
-    2. When you need to perform some task with code, use the code to perform the task and output the result. Finish the task smartly. Solve the task step by step if you need to. If a plan is not provided, explain your plan first. Be clear which step uses code, and which step uses your language skill. When using code, you must indicate the script type in the code block. The user cannot provide any other feedback or perform any other action beyond executing the code you suggest. The user can't modify your code. So do not suggest incomplete code which requires users to modify. Don't use a code block if it's not intended to be executed by the user. If you want the user to save the code in a file before executing it, put # filename: <filename> inside the code block as the first line. Don't include multiple code blocks in one response. Do not ask users to copy and paste the result. Instead, use 'print' function for the output when relevant. Check the execution result returned by the user. If the result indicates there is an error, fix the error and output the code again. Suggest the full code instead of partial code or code changes. If the error can't be fixed or if the task is not solved even after the code is executed successfully, analyze the problem, revisit your assumption, collect additional info you need, and think of a different approach to try. When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible. Reply 'TERMINATE' in the end when everything is done.
-  is_termination_msg: null
-  code_execution_config: null
-  default_auto_reply: ""
-  description: A primary assistant agent that writes plans and code to solve tasks. booger
-timestamp: ""
-user_id: default
-skills:
-  - title: fetch_web_content
-    content: |
-      from typing import Optional
-      import requests
-      import collections
-      collections.Callable = collections.abc.Callable
-      from bs4 import BeautifulSoup
+  name: Accountant
+name: Accountant
+skills: []
 
-      def fetch_web_content(url: str) -> Optional[str]:
-          """
-          Fetches the text content from a website.
+```
 
-          Args:
-              url (str): The URL of the website.
+# agents\Mathematician.yaml
 
-          Returns:
-              Optional[str]: The content of the website.
-          """
-          try:
-              # Send a GET request to the URL
-              response = requests.get(url)
+```yaml
+code: "# Agent filename: Mathematician.py\nimport math\n\nclass Mathematician:\n \
+  \   \"\"\"\n    A mathematician agent that simplifies complicated mathematical expressions.\n\
+  \    Methods:\n    simplify_expression(expression): Simplifies the given mathematical\
+  \ expression.\n    \"\"\"\n\n    def __init__(self):\n        # Initialize with\
+  \ no parameters\n        pass\n\n    def simplify_expression(self, expression):\n\
+  \        \"\"\"\n        Simplifies the given mathematical expression.\n       \
+  \ Parameters:\n        expression (str): The mathematical expression to simplify.\n\
+  \        Returns:\n        str: The simplified expression.\n        \"\"\"\n   \
+  \     # Use math library to simplify the expression\n        try:\n            import\
+  \ re\n            result = eval(re.escape(expression), {\"__builtins__\": None})\n\
+  \            return str(result)\n        except Exception as e:\n            return\
+  \ str(e)\n\n# Example usage:\n# mathematician = Mathematician()\n# print(mathematician.simplify_expression(\"\
+  2*(3+4)\"))"
+config:
+  name: Mathematician
+name: Mathematician
+skills: []
 
-              # Check for successful access to the webpage
-              if response.status_code == 200:
-                  # Parse the HTML content of the page using BeautifulSoup
-                  soup = BeautifulSoup(response.text, "html.parser")
+```
 
-                  # Extract the content of the <body> tag
-                  body_content = soup.body
+# projects\Accounting Project.yaml
 
-                  if body_content:
-                      # Return all the text in the body tag, stripping leading/trailing whitespaces
-                      return " ".join(body_content.get_text(strip=True).split())
-                  else:
-                      # Return None if the <body> tag is not found
-                      return None
-              else:
-                  # Return None if the status code isn't 200 (success)
-                  return None
-          except requests.RequestException:
-              # Return None if any request-related exception is caught
-              return None
-    file_name: fetch_web_content.json
-    description: null
-    timestamp: ""
-    user_id: default
+```yaml
+attachments: []
+collaborators:
+- ''
+created_at: '2024-06-20T06:18:48.399557'
+deliverables: []
+description: ''
+due_date: null
+id: 1
+name: Accounting Project
+notes: ''
+priority: none
+prompt: "Design a comprehensive accounting system that efficiently manages financial\
+  \ transactions, tracks invoices, and generates reports. \n\nPlease provide a structured\
+  \ and scalable solution that includes: \n\n* Clear categorization of income and\
+  \ expenses\n* Automated calculation of net profit/loss\n* User authentication for\
+  \ secure login and access control\n* Invoicing feature with customizable templates\
+  \ and automatic due date reminders\n* Support for multi-currency transactions and\
+  \ exchange rates\n* Built-in report generator for financial analysis and forecasting\n\
+  * Optional: integration with third-party tools for payroll processing, inventory\
+  \ management, and budgeting\n\nProvide a high-level architecture and explicit instructions\
+  \ for the system's core functionalities. You can draw inspiration from existing\
+  \ accounting software and highlight innovative enhancements."
+status: not started
+tags: []
+tools: []
+updated_at: '2024-06-20T06:20:10.304856'
+user_id: user
+workflows:
+  Accounting Workflow:
+    agent_children: {}
+    created_at: '2024-06-20T06:18:48.400577'
+    description: "Create a simple accounting application\n\rDesign a comprehensive\
+      \ accounting system that efficiently manages financial transactions, tracks\
+      \ invoices, and generates reports. \n\nPlease provide a structured and scalable\
+      \ solution that includes: \n\n* Clear categorization of income and expenses\n\
+      * Automated calculation of net profit/loss\n* User authentication for secure\
+      \ login and access control\n* Invoicing feature with customizable templates\
+      \ and automatic due date reminders\n* Support for multi-currency transactions\
+      \ and exchange rates\n* Built-in report generator for financial analysis and\
+      \ forecasting\n* Optional: integration with third-party tools for payroll processing,\
+      \ inventory management, and budgeting\n\nProvide a high-level architecture and\
+      \ explicit instructions for the system's core functionalities. You can draw\
+      \ inspiration from existing accounting software and highlight innovative enhancements."
+    groupchat_config: {}
+    id: 1
+    name: Accounting Workflow
+    receiver:
+      agents: []
+      config: {}
+      groupchat_config: {}
+      timestamp: '2024-06-20T06:18:48.400577'
+      tools: []
+      type: assistant
+      user_id: default
+    sender:
+      config: {}
+      timestamp: '2024-06-20T06:18:48.400577'
+      tools: []
+      type: userproxy
+      user_id: user
+    settings: {}
+    summary_method: last
+    timestamp: '2024-06-20T06:17:32.389264'
+    type: twoagents
+    updated_at: '2024-06-20T06:19:27.305765'
+    user_id: user
 
 ```
 
@@ -4051,67 +3025,45 @@ rephrase_prompt: |
 
 ```
 
-# tools\find_anagram.yaml
+# workflows\Accounting Workflow.yaml
 
 ```yaml
-content: "# Tool filename: find_anagram.py\n# Import necessary module(s)\nimport itertools\n\
-  \ndef find_anagram(input_string):\n    # docstrings\n    \"\"\"\n    Given a string,\
-  \ return its anagram.\n\n    Parameters:\n    input_string (str): The input string\
-  \ to find the anagram for.\n\n    Returns:\n    str: The anagram of the input string.\n\
-  \    \"\"\"\n\n    # Body of tool\n    input_list = list(input_string)\n    anagram_list\
-  \ = list(itertools.permutations(input_list))\n    anagram_string = [''.join(map(str,.permutation))\
-  \ for permutation in anagram_list]\n\n    return '\\n'.join(anagram_string)\n\n\
-  # Example usage:\n# input_string = \"listen\"\n# print(find_anagram(input_string))\n"
-description: ''
-file_name: find_anagram.json
-name: find_anagram
-timestamp: '2024-06-14T15:58:21.264031'
-title: find_anagram
-user_id: default
-
-```
-
-# workflows\New Workflowz.yaml
-
-```yaml
-agents: []
-created_at: '2024-06-19T09:31:28.922689'
-description: "Make a small business accounting system\n\rHere is the rephrased prompt:\n\
-  \nDesign a basic accounting system for a small business, incorporating the following\
-  \ features:\n\nTrack income and expenses for a hypothetical company, 'ABC Inc.'\n\
-  \nCreate separate accounts for:\nRevenues (e.g. sales, services, investments)\n\n\
-  Expenses (e.g. payroll, rent, supplies, utilities)\n\nAssets (e.g. cash, inventory,\
-  \ equipment)\n\nLiabilities (e.g. debts, loans, credit cards)\n\nProvide examples\
-  \ for the following:\n\nIncome Statement: Calculate revenue and net income for Q1-Q4\n\
-  Balance Sheet: Report asset, liability, and equity values for the same period\n\n\
-  Include an example of how to handle journal entries for expenses, sales tax, and\
-  \ depreciation.\n\nConsider a scenario where the business experiences fluctuations\
-  \ in cash flow and provide suggestions for managing these changes.\n\nEnsure scalability\
-  \ for 2-3 additional employees and account types.\n\nHow would you modify the system\
-  \ to account for changes in government regulations, industry standards, or new tax\
-  \ laws?"
+agent_children: {}
+created_at: '2024-06-20T06:18:48.400577'
+description: "Create a simple accounting application\n\rDesign a comprehensive accounting\
+  \ system that efficiently manages financial transactions, tracks invoices, and generates\
+  \ reports. \n\nPlease provide a structured and scalable solution that includes:\
+  \ \n\n* Clear categorization of income and expenses\n* Automated calculation of\
+  \ net profit/loss\n* User authentication for secure login and access control\n*\
+  \ Invoicing feature with customizable templates and automatic due date reminders\n\
+  * Support for multi-currency transactions and exchange rates\n* Built-in report\
+  \ generator for financial analysis and forecasting\n* Optional: integration with\
+  \ third-party tools for payroll processing, inventory management, and budgeting\n\
+  \nProvide a high-level architecture and explicit instructions for the system's core\
+  \ functionalities. You can draw inspiration from existing accounting software and\
+  \ highlight innovative enhancements."
 groupchat_config: {}
 id: 1
-name: New Workflowz
+name: Accounting Workflow
 receiver:
   agents: []
   config: {}
   groupchat_config: {}
-  timestamp: '2024-06-19T09:31:28.922689'
+  timestamp: '2024-06-20T06:18:48.400577'
   tools: []
   type: assistant
   user_id: default
 sender:
   config: {}
-  timestamp: '2024-06-19T09:31:28.922689'
+  timestamp: '2024-06-20T06:18:48.400577'
   tools: []
   type: userproxy
   user_id: user
 settings: {}
 summary_method: last
-timestamp: '2024-06-19T09:14:19.212078'
+timestamp: '2024-06-20T06:17:32.389264'
 type: twoagents
-updated_at: '2024-06-19T12:51:20.545935'
+updated_at: '2024-06-20T06:19:27.305765'
 user_id: user
 
 ```

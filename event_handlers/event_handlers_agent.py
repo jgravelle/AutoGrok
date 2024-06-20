@@ -15,7 +15,7 @@ def handle_agent_close():
         print("handle_agent_close()")
     st.session_state.current_agent = None
     st.session_state.agent_dropdown = "Select..."
-    st.rerun()
+    # st.rerun()
 
 
 def handle_ai_agent_creation():
@@ -112,7 +112,7 @@ def handle_agent_selection():
             agent = AgentBaseModel.from_dict(agent_data)
             AgentBaseModel.create_agent(agent_name, agent)
             st.session_state.current_agent = agent
-            st.session_state.agent_dropdown = agent_name
+            st.session_state.agent_dropdown = agent_name    
     elif selected_agent == "Create with AI...":
         # Clear the current agent selection
         st.session_state.current_agent = None
