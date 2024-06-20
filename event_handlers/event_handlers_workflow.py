@@ -1,5 +1,6 @@
 # event_handlers_workflow.py
 
+import json
 import os
 import streamlit as st
 import yaml
@@ -44,9 +45,14 @@ def handle_workflow_name_change():
         old_workflow_name = st.session_state.current_workflow.name
         st.session_state.current_workflow.name = new_workflow_name
         
-        # Rename the workflow file
+        # Rename the YAML project file
         old_file_path = f"workflows/yaml/{old_workflow_name}.yaml"
         new_file_path = f"workflows/yaml/{new_workflow_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON project file
+        old_file_path = f"workflows/json/{old_workflow_name}.json"
+        new_file_path = f"workflows/json/{new_workflow_name}.json"
         os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
@@ -210,3 +216,5 @@ def update_workflow():
     workflow_data = st.session_state.current_workflow.to_dict()
     with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
         yaml.dump(workflow_data, file)
+    with open(f"workflows/yaml/{workflow_name}.json", "w") as file:
+        json.dump(workflow_data, file)

@@ -5,7 +5,8 @@ import streamlit as st
 from base_models.agent_base_model import AgentBaseModel
 from configs.config_local import DEBUG
 from event_handlers.event_handlers_agent import (
-    handle_agent_close, handle_agent_selection, handle_ai_agent_creation, handle_agent_property_change
+    handle_agent_close, handle_agent_selection, handle_ai_agent_creation, 
+    handle_agent_name_change, handle_agent_property_change
 )
 
 def display_agent_dropdown():
@@ -34,7 +35,7 @@ def display_agent_dropdown():
             "Agent Name:",
             value=st.session_state.current_agent.name,
             key="agent_name_edit",
-            on_change=handle_agent_property_change,
+            on_change=handle_agent_name_change,
         )
         if st.button("CLOSE THIS AGENT"):
             handle_agent_close()
@@ -51,6 +52,7 @@ def display_agent_properties():
     agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
     agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
     agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
+    
 
 def display_sidebar_agents():
     if DEBUG:

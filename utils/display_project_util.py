@@ -12,8 +12,9 @@ from event_handlers.event_handlers_project import (
     handle_project_description_change, handle_project_due_date_change, 
     handle_project_name_change, handle_project_notes_change, 
     handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
-    handle_prompt_change
+    handle_project_prompt_reengineer
 )
+from event_handlers.event_handlers_prompt import handle_prompt_change
 
 
 def display_project_dropdown():
@@ -25,16 +26,18 @@ def display_project_dropdown():
         project_names.sort()
         selected_project = st.selectbox(
             "Projects",
-            ["Select..."] + ["Create..."] + project_names,
+            ["Select..."] + ["Create manually..."] + ["Create from AI..."] + project_names,
             key="project_dropdown",
             on_change=handle_project_selection,
         )
 
         if selected_project == "Select...":
             return
-        if selected_project == "Create...":
+        if selected_project == "Create manually...":
             # Show the create project input field
             st.text_input("Project Name:", key="project_name_input", on_change=handle_project_selection)
+        if selected_project == "Create from AI...":
+            st.text_area("Enter your project request:", key="project_prompt_input", on_change=(handle_project_prompt_reengineer))
     else:
         # Display the selected project name as an editable text input
         st.session_state.current_project.name = st.text_input(

@@ -1,6 +1,8 @@
 # event_handlers_agent.py
 
+import json
 import importlib
+import os
 import re
 import streamlit as st
 import yaml
@@ -71,21 +73,22 @@ def handle_ai_agent_creation():
             st.error(f"Error generating the agent: {str(e)}")
 
 
+import os
+import yaml
+import json
+from datetime import datetime
+
+
 def handle_agent_property_change():
     if DEBUG:
         print("handle_agent_property_change()")
     agent = st.session_state.current_agent
     if agent:
-        agent.name = st.session_state.current_agent.name
-        agent.description = st.session_state.current_agent.description
-        agent.role = st.session_state.current_agent.role
-        agent.goal = st.session_state.current_agent.goal
-        agent.backstory = st.session_state.current_agent.backstory
-
-        agent_data = agent.to_dict()
-        agent_name = agent.name
-        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
-            yaml.dump(agent_data, file)
+        agent.description = st.session_state[f"agent_description_{agent.name}"]
+        agent.role = st.session_state[f"agent_role_{agent.name}"]
+        agent.goal = st.session_state[f"agent_goal_{agent.name}"]
+        agent.backstory = st.session_state[f"agent_backstory_{agent.name}"]
+        update_agent()
 
 
 def handle_agent_selection():
@@ -127,7 +130,18 @@ def handle_agent_name_change():
         print("handle_agent_name_change()")
     new_agent_name = st.session_state.agent_name_edit.strip()
     if new_agent_name:
+        old_agent_name = st.session_state.current_agent.name
         st.session_state.current_agent.name = new_agent_name
+        
+        # Rename the YAML agent file
+        old_file_path = f"agents/yaml/{old_agent_name}.yaml"
+        new_file_path = f"agents/yaml/{new_agent_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON agent file
+        old_file_path = f"agents/json/{old_agent_name}.json"
+        new_file_path = f"agents/json/{new_agent_name}.json"
+        os.rename(old_file_path, new_file_path)
         update_agent()
 
 
@@ -139,3 +153,5 @@ def update_agent():
     agent_data = st.session_state.current_agent.to_dict()
     with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
         yaml.dump(agent_data, file)
+    with open(f"agents/json/{agent_name}.json", "w") as file:
+        json.dump(agent_data, file)

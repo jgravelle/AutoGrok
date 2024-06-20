@@ -5,6 +5,15 @@ import streamlit as st
 import yaml
 
 from configs.config_local import DEBUG
+from event_handlers.event_handlers_shared import update_project
+
+def handle_prompt_change():
+    if DEBUG:
+        print("called handle_prompt_change()")
+    new_prompt = st.session_state.prompt.strip()
+    if new_prompt:
+        st.session_state.current_project.prompt = new_prompt
+        update_project()
 
 def handle_prompt(user_request, prompt_file_path, prompt_label):
     if DEBUG:

@@ -14,8 +14,14 @@ def display_files():
         print("display_files()")
 
     # Define the folders to display
-    folders = ['agents/yaml', 'projects/yaml', 'tools/yaml', 'workflows/yaml']
-
+    folders = (
+        [
+            'agents/json', 'agents/yaml', 
+            'projects/json','projects/yaml', 
+            'tools/json', 'tools/yaml', 
+            'workflows/json', 'workflows/yaml'
+        ]
+    )
     # Create a selectbox to choose the folder
     selected_folder = st.selectbox("Select a folder", folders)
 

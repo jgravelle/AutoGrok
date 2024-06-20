@@ -1,4 +1,6 @@
 # tool_base_model.py
+
+import json
 import os
 import yaml
 
@@ -53,6 +55,10 @@ class ToolBaseModel:
         # Create a YAML file for the tool
         with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
+
+        # Create a JSON file for the tool
+        with open(f"tools/json/{tool_name}.json", "w") as file:
+            json.dump(tool_data, file)
         
         return tool
 

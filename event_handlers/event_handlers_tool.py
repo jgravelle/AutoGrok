@@ -1,6 +1,8 @@
 # event_handlers_tool.py
 
 import importlib
+import json
+import os
 import re
 import streamlit as st
 import yaml
@@ -80,6 +82,8 @@ def handle_tool_property_change():
         tool_name = tool.name
         with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
+        with open(f"tools/json/{tool_name}.json", "w") as file:
+            json.dump(tool_data, file)
 
 
 def handle_tool_selection():
@@ -118,7 +122,18 @@ def handle_tool_name_change():
         print("handle_tool_name_change()")
     new_tool_name = st.session_state.tool_name_edit.strip()
     if new_tool_name:
+        old_tool_name = st.session_state.current_tool.name
         st.session_state.current_tool.name = new_tool_name
+        
+        # Rename the YAML project file
+        old_file_path = f"projects/yaml/{old_tool_name}.yaml"
+        new_file_path = f"projects/yaml/{new_tool_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON project file
+        old_file_path = f"projects/json/{old_tool_name}.json"
+        new_file_path = f"projects/json/{new_tool_name}.json"
+        os.rename(old_file_path, new_file_path)
         update_tool()
 
 

@@ -1,5 +1,6 @@
 # agent_base_model
 
+import json
 import os
 import yaml
 
@@ -140,6 +141,10 @@ class AgentBaseModel:
         # Create a YAML file for the agent
         with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
+
+        # Create a JSON file for the agent
+        with open(f"agents/json/{agent_name}.json", "w") as file:
+            json.dump(agent_data, file)
         
         return agent
 
@@ -157,8 +162,26 @@ class AgentBaseModel:
     def load_agents() -> List[str]:
         agent_names = []
         for file in os.listdir("agents/yaml"):
-            if file.endswith(".yaml"):
+            if file and file.endswith(".yaml"):
                 agent_name = file[:-5]  # Remove the ".yaml" extension
                 agent_names.append(agent_name)
+        if not agent_names:
+            for file in os.listdir("agents/json"):
+                if file and file.endswith(".json"):
+                    agent_name = file[:-5]  # Remove the ".yaml" extension
+                    agent_names.append(agent_name)
         return agent_names
     
+
+    def rename_agent(self, old_name, new_name):
+        # Rename YAML file
+        old_yaml_path = f"agents/yaml/{old_name}.yaml"
+        new_yaml_path = f"agents/yaml/{new_name}.yaml"
+        if os.path.exists(old_yaml_path):
+            os.rename(old_yaml_path, new_yaml_path)
+
+        # Rename JSON file
+        old_json_path = f"agents/json/{old_name}.json"
+        new_json_path = f"agents/json/{new_name}.json"
+        if os.path.exists(old_json_path):
+            os.rename(old_json_path, new_json_path)

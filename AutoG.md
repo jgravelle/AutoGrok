@@ -36,6 +36,9 @@ from configs.config_local import LLM_PROVIDER
 
 def initialize_session_variables():
 
+    if "agent_name_input" not in st.session_state:
+        st.session_state.agent_name_input = ""
+
     if "available_models" not in st.session_state:
         st.session_state.available_models = []
 
@@ -96,6 +99,7 @@ def initialize_session_variables():
 ```python
 # agent_base_model
 
+import json
 import os
 import yaml
 
@@ -236,6 +240,10 @@ class AgentBaseModel:
         # Create a YAML file for the agent
         with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
             yaml.dump(agent_data, file)
+
+        # Create a JSON file for the agent
+        with open(f"agents/json/{agent_name}.json", "w") as file:
+            json.dump(agent_data, file)
         
         return agent
 
@@ -253,11 +261,29 @@ class AgentBaseModel:
     def load_agents() -> List[str]:
         agent_names = []
         for file in os.listdir("agents/yaml"):
-            if file.endswith(".yaml"):
+            if file and file.endswith(".yaml"):
                 agent_name = file[:-5]  # Remove the ".yaml" extension
                 agent_names.append(agent_name)
+        if not agent_names:
+            for file in os.listdir("agents/json"):
+                if file and file.endswith(".json"):
+                    agent_name = file[:-5]  # Remove the ".yaml" extension
+                    agent_names.append(agent_name)
         return agent_names
     
+
+    def rename_agent(self, old_name, new_name):
+        # Rename YAML file
+        old_yaml_path = f"agents/yaml/{old_name}.yaml"
+        new_yaml_path = f"agents/yaml/{new_name}.yaml"
+        if os.path.exists(old_yaml_path):
+            os.rename(old_yaml_path, new_yaml_path)
+
+        # Rename JSON file
+        old_json_path = f"agents/json/{old_name}.json"
+        new_json_path = f"agents/json/{new_name}.json"
+        if os.path.exists(old_json_path):
+            os.rename(old_json_path, new_json_path)
 ```
 
 # base_models\project_base_model.py
@@ -266,6 +292,7 @@ class AgentBaseModel:
 # project_base_model.py
 
 import enum
+import json
 import os
 import yaml
 
@@ -326,6 +353,10 @@ class ProjectBaseModel:
         project_data = project.to_dict()
         with open(f"projects/yaml/{project_name}.yaml", "w") as file:
             yaml.dump(project_data, file)
+
+        # Create a JSON file for the project
+        with open(f"projects/json/{project_name}.json", "w") as file:
+            json.dump(project_data, file)
         
         return project
 
@@ -346,6 +377,11 @@ class ProjectBaseModel:
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
+        if not project_names:
+            for file in os.listdir("projects/json"):
+                if file.endswith(".json"):
+                    project_name = file[:-5]  # Remove the ".json" extension
+                    project_names.append(project_name)
         return project_names
 
     def mark_deliverable_done(self, index: int):
@@ -422,6 +458,8 @@ class ProjectStatus(enum.Enum):
 
 ```python
 # tool_base_model.py
+
+import json
 import os
 import yaml
 
@@ -476,6 +514,10 @@ class ToolBaseModel:
         # Create a YAML file for the tool
         with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
+
+        # Create a JSON file for the tool
+        with open(f"tools/json/{tool_name}.json", "w") as file:
+            json.dump(tool_data, file)
         
         return tool
 
@@ -505,6 +547,7 @@ class ToolBaseModel:
 ```python
 # workflow_base_model
 
+import json
 import os
 import streamlit as st
 import yaml
@@ -793,6 +836,10 @@ class WorkflowBaseModel:
         with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
             yaml.dump(workflow_data, file)
 
+        # Create a JSON file for the workflow
+        with open(f"workflows/json/{workflow_name}.json", "w") as file:
+            json.dump(workflow_data, file)
+
         return workflow
     
 
@@ -944,7 +991,9 @@ DEBUG = True
 ```python
 # event_handlers_agent.py
 
+import json
 import importlib
+import os
 import re
 import streamlit as st
 import yaml
@@ -1015,21 +1064,22 @@ def handle_ai_agent_creation():
             st.error(f"Error generating the agent: {str(e)}")
 
 
+import os
+import yaml
+import json
+from datetime import datetime
+
+
 def handle_agent_property_change():
     if DEBUG:
         print("handle_agent_property_change()")
     agent = st.session_state.current_agent
     if agent:
-        agent.name = st.session_state.current_agent.name
-        agent.description = st.session_state.current_agent.description
-        agent.role = st.session_state.current_agent.role
-        agent.goal = st.session_state.current_agent.goal
-        agent.backstory = st.session_state.current_agent.backstory
-
-        agent_data = agent.to_dict()
-        agent_name = agent.name
-        with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
-            yaml.dump(agent_data, file)
+        agent.description = st.session_state[f"agent_description_{agent.name}"]
+        agent.role = st.session_state[f"agent_role_{agent.name}"]
+        agent.goal = st.session_state[f"agent_goal_{agent.name}"]
+        agent.backstory = st.session_state[f"agent_backstory_{agent.name}"]
+        update_agent()
 
 
 def handle_agent_selection():
@@ -1071,7 +1121,18 @@ def handle_agent_name_change():
         print("handle_agent_name_change()")
     new_agent_name = st.session_state.agent_name_edit.strip()
     if new_agent_name:
+        old_agent_name = st.session_state.current_agent.name
         st.session_state.current_agent.name = new_agent_name
+        
+        # Rename the YAML agent file
+        old_file_path = f"agents/yaml/{old_agent_name}.yaml"
+        new_file_path = f"agents/yaml/{new_agent_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON agent file
+        old_file_path = f"agents/json/{old_agent_name}.json"
+        new_file_path = f"agents/json/{new_agent_name}.json"
+        os.rename(old_file_path, new_file_path)
         update_agent()
 
 
@@ -1083,6 +1144,8 @@ def update_agent():
     agent_data = st.session_state.current_agent.to_dict()
     with open(f"agents/yaml/{agent_name}.yaml", "w") as file:
         yaml.dump(agent_data, file)
+    with open(f"agents/json/{agent_name}.json", "w") as file:
+        json.dump(agent_data, file)
 ```
 
 # event_handlers\event_handlers_files.py
@@ -1103,14 +1166,13 @@ from configs.config_local import DEBUG
 
 import os
 import streamlit as st
-import yaml
 
-from datetime import datetime
 from base_models.project_base_model import ProjectBaseModel
 from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
-from event_handlers.event_handlers_workflow import handle_workflow_close
+from event_handlers.event_handlers_prompt import handle_prompt
 from event_handlers.event_handlers_shared import update_project
+from event_handlers.event_handlers_workflow import handle_workflow_close, update_workflow
 
 # def handle_project_attachments_change():
 #     new_project_attachments = st.session_state.current_project.attachments.strip()
@@ -1173,9 +1235,14 @@ def handle_project_name_change():
         old_project_name = st.session_state.current_project.name
         st.session_state.current_project.name = new_project_name
         
-        # Rename the project file
+        # Rename the YAML project file
         old_file_path = f"projects/yaml/{old_project_name}.yaml"
         new_file_path = f"projects/yaml/{new_project_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON project file
+        old_file_path = f"projects/json/{old_project_name}.json"
+        new_file_path = f"projects/json/{new_project_name}.json"
         os.rename(old_file_path, new_file_path)
         
         update_project()
@@ -1190,13 +1257,34 @@ def handle_project_notes_change():
         update_project()
 
 
+def handle_project_prompt_reengineer():
+    if DEBUG:
+        print("handle_project_prompt_reengineer()")
+    user_request = st.session_state.project_prompt_input.strip()
+    result_text = handle_prompt(user_request, "prompts/rephrase_prompt.yaml", "rephrase_prompt")
+    if result_text:
+        st.session_state.project_prompt_output = result_text
+        # Create new Project named "New Project" with the rephrased request as the 'prompt' property value
+        st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
+        st.session_state.current_project.create_project("New Project")
+        st.session_state.current_project.set_prompt(result_text)
+        st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
+        st.session_state.current_workflow.create_workflow("New Workflow")
+        st.session_state.current_workflow.set_description(user_request + "\n\r" + result_text)
+
+        update_project()
+        update_workflow()
+
+
 def handle_project_selection():
     if DEBUG:
         print("called handle_project_selection()")
     selected_project = st.session_state.project_dropdown
     if selected_project == "Select...":
         return
-    if selected_project == "Create...":
+    if selected_project == "Create from AI...":
+        return
+    if selected_project == "Create manually...":
         project_name = st.session_state.project_name_input.strip()
         if project_name:
             project = ProjectBaseModel(name=project_name)
@@ -1232,15 +1320,6 @@ def handle_project_user_id_change():
         st.session_state.current_project.user_id = new_project_user_id
         update_project()
 
-
-def handle_prompt_change():
-    if DEBUG:
-        print("called handle_prompt_change()")
-    new_prompt = st.session_state.prompt.strip()
-    if new_prompt:
-        st.session_state.current_project.prompt = new_prompt
-        update_project()
-
 ```
 
 # event_handlers\event_handlers_prompt.py
@@ -1253,6 +1332,15 @@ import streamlit as st
 import yaml
 
 from configs.config_local import DEBUG
+from event_handlers.event_handlers_shared import update_project
+
+def handle_prompt_change():
+    if DEBUG:
+        print("called handle_prompt_change()")
+    new_prompt = st.session_state.prompt.strip()
+    if new_prompt:
+        st.session_state.current_project.prompt = new_prompt
+        update_project()
 
 def handle_prompt(user_request, prompt_file_path, prompt_label):
     if DEBUG:
@@ -1346,20 +1434,30 @@ def load_provider_classes():
 # event_handlers\event_handlers_shared.py
 
 ```python
+# event_handlers_shared.py
+
+import json
 import streamlit as st
 import yaml
 
+from base_models.project_base_model import ProjectBaseModel, WorkflowBaseModel
 from configs.config_local import DEBUG
 from datetime import datetime
+
+
 
 def update_project():
     if DEBUG:
         print("called update_project()")
+
+    # Update the project
     st.session_state.current_project.updated_at = datetime.now().isoformat()
     project_name = st.session_state.current_project.name
     project_data = st.session_state.current_project.to_dict()
     with open(f"projects/yaml/{project_name}.yaml", "w") as file:
         yaml.dump(project_data, file)
+    with open(f"projects/json/{project_name}.json", "w") as file:
+        json.dump(project_data, file)
 ```
 
 # event_handlers\event_handlers_tool.py
@@ -1368,6 +1466,8 @@ def update_project():
 # event_handlers_tool.py
 
 import importlib
+import json
+import os
 import re
 import streamlit as st
 import yaml
@@ -1447,6 +1547,8 @@ def handle_tool_property_change():
         tool_name = tool.name
         with open(f"tools/yaml/{tool_name}.yaml", "w") as file:
             yaml.dump(tool_data, file)
+        with open(f"tools/json/{tool_name}.json", "w") as file:
+            json.dump(tool_data, file)
 
 
 def handle_tool_selection():
@@ -1485,7 +1587,18 @@ def handle_tool_name_change():
         print("handle_tool_name_change()")
     new_tool_name = st.session_state.tool_name_edit.strip()
     if new_tool_name:
+        old_tool_name = st.session_state.current_tool.name
         st.session_state.current_tool.name = new_tool_name
+        
+        # Rename the YAML project file
+        old_file_path = f"projects/yaml/{old_tool_name}.yaml"
+        new_file_path = f"projects/yaml/{new_tool_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON project file
+        old_file_path = f"projects/json/{old_tool_name}.json"
+        new_file_path = f"projects/json/{new_tool_name}.json"
+        os.rename(old_file_path, new_file_path)
         update_tool()
 
 
@@ -1504,6 +1617,7 @@ def update_tool():
 ```python
 # event_handlers_workflow.py
 
+import json
 import os
 import streamlit as st
 import yaml
@@ -1548,9 +1662,14 @@ def handle_workflow_name_change():
         old_workflow_name = st.session_state.current_workflow.name
         st.session_state.current_workflow.name = new_workflow_name
         
-        # Rename the workflow file
+        # Rename the YAML project file
         old_file_path = f"workflows/yaml/{old_workflow_name}.yaml"
         new_file_path = f"workflows/yaml/{new_workflow_name}.yaml"
+        os.rename(old_file_path, new_file_path)
+
+        # Rename the JSON project file
+        old_file_path = f"workflows/json/{old_workflow_name}.json"
+        new_file_path = f"workflows/json/{new_workflow_name}.json"
         os.rename(old_file_path, new_file_path)
         
         # Update the workflow name in current_project.workflows
@@ -1714,6 +1833,8 @@ def update_workflow():
     workflow_data = st.session_state.current_workflow.to_dict()
     with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
         yaml.dump(workflow_data, file)
+    with open(f"workflows/yaml/{workflow_name}.json", "w") as file:
+        json.dump(workflow_data, file)
 ```
 
 # providers\base_provider.py
@@ -2089,7 +2210,8 @@ import streamlit as st
 from base_models.agent_base_model import AgentBaseModel
 from configs.config_local import DEBUG
 from event_handlers.event_handlers_agent import (
-    handle_agent_close, handle_agent_selection, handle_ai_agent_creation, handle_agent_property_change
+    handle_agent_close, handle_agent_selection, handle_ai_agent_creation, 
+    handle_agent_name_change, handle_agent_property_change
 )
 
 def display_agent_dropdown():
@@ -2118,7 +2240,7 @@ def display_agent_dropdown():
             "Agent Name:",
             value=st.session_state.current_agent.name,
             key="agent_name_edit",
-            on_change=handle_agent_property_change,
+            on_change=handle_agent_name_change,
         )
         if st.button("CLOSE THIS AGENT"):
             handle_agent_close()
@@ -2135,6 +2257,7 @@ def display_agent_properties():
     agent.role = st.text_input("Role:", value=agent.role or "", key=f"agent_role_{agent.name}", on_change=handle_agent_property_change)
     agent.goal = st.text_input("Goal:", value=agent.goal or "", key=f"agent_goal_{agent.name}", on_change=handle_agent_property_change)
     agent.backstory = st.text_area("Backstory:", value=agent.backstory or "", key=f"agent_backstory_{agent.name}", on_change=handle_agent_property_change)
+    
 
 def display_sidebar_agents():
     if DEBUG:
@@ -2264,8 +2387,14 @@ def display_files():
         print("display_files()")
 
     # Define the folders to display
-    folders = ['agents/yaml', 'projects/yaml', 'tools/yaml', 'workflows/yaml']
-
+    folders = (
+        [
+            'agents/json', 'agents/yaml', 
+            'projects/json','projects/yaml', 
+            'tools/json', 'tools/yaml', 
+            'workflows/json', 'workflows/yaml'
+        ]
+    )
     # Create a selectbox to choose the folder
     selected_folder = st.selectbox("Select a folder", folders)
 
@@ -2398,8 +2527,9 @@ from event_handlers.event_handlers_project import (
     handle_project_description_change, handle_project_due_date_change, 
     handle_project_name_change, handle_project_notes_change, 
     handle_project_selection, handle_project_status_change, handle_project_user_id_change, 
-    handle_prompt_change
+    handle_project_prompt_reengineer
 )
+from event_handlers.event_handlers_prompt import handle_prompt_change
 
 
 def display_project_dropdown():
@@ -2411,16 +2541,18 @@ def display_project_dropdown():
         project_names.sort()
         selected_project = st.selectbox(
             "Projects",
-            ["Select..."] + ["Create..."] + project_names,
+            ["Select..."] + ["Create manually..."] + ["Create from AI..."] + project_names,
             key="project_dropdown",
             on_change=handle_project_selection,
         )
 
         if selected_project == "Select...":
             return
-        if selected_project == "Create...":
+        if selected_project == "Create manually...":
             # Show the create project input field
             st.text_input("Project Name:", key="project_name_input", on_change=handle_project_selection)
+        if selected_project == "Create from AI...":
+            st.text_area("Enter your project request:", key="project_prompt_input", on_change=(handle_project_prompt_reengineer))
     else:
         # Display the selected project name as an editable text input
         st.session_state.current_project.name = st.text_input(
@@ -2556,68 +2688,22 @@ def display_settings():
 
 import streamlit as st
 
-from base_models.project_base_model import ProjectBaseModel
-from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
-from event_handlers.event_handlers_prompt import handle_prompt
-from event_handlers.event_handlers_shared import update_project
-from event_handlers.event_handlers_workflow import update_workflow
 from utils.display_agent_util import display_sidebar_agents
-
 
 def display_sidebar():
     if DEBUG:
         print("display_sidebar_message()")
   
-    selected_tab = st.sidebar.selectbox("Select a tab:", ["Home", "Prompt", "Agents", "Tools"])
-        
-    if selected_tab == "Home":    
-        display_sidebar_home()
-    elif selected_tab == "Prompt":
-        display_sidebar_prompt_reengineer()
-    elif selected_tab == "Agents":
-        display_sidebar_agents()
-    else:
-        st.write("Content for Tab 3")
-
     st.sidebar.image('gfx/AutoGroqLogo_sm.png')
-    
+    display_sidebar_home()
+    display_sidebar_agents()
 
 def display_sidebar_home():
     st.sidebar.write("<div class='teeny'>Need agents right frickin' now? : <a href='https://autogroq.streamlit.app/'>https://autogroq.streamlit.app/</a></div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>Universal AI Agents Made Easy. <br/> Theoretically.</div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>We're putting the 'mental' in 'experimental'.</div>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny yellow'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)  
-
-
-def display_sidebar_prompt_reengineer():
-    if DEBUG:
-        print("display_sidebar_prompt_reengineer()")
-    
-    # Create the input field in the sidebar
-    st.sidebar.text_area("Quickstart - Enter your project request:", key="sidebar_prompt_input", on_change=(handle_sidebar_prompt_reengineer))
-
-    # Display the rephrased request if available
-    if "sidebar_prompt_output" in st.session_state:
-        st.sidebar.text_area("Rephrased Request:", value=st.session_state.sidebar_prompt_output, height=200)
-
-def handle_sidebar_prompt_reengineer():
-    if DEBUG:
-        print("handle_sidebar_prompt_reengineer()")
-    user_request = st.session_state.sidebar_prompt_input.strip()
-    result_text = handle_prompt(user_request, "prompts/rephrase_prompt.yaml", "rephrase_prompt")
-    if result_text:
-        st.session_state.sidebar_prompt_output = result_text
-        # Create new Project named "New Project" with the rephrased request as the 'prompt' property value
-        st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
-        st.session_state.current_project.create_project("New Project")
-        st.session_state.current_project.set_prompt(result_text)
-        st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
-        st.session_state.current_workflow.create_workflow("New Workflow")
-        st.session_state.current_workflow.set_description(user_request + "\n\r" + result_text)
-
-        update_project()
-        update_workflow()
 
 ```
 
@@ -2901,6 +2987,189 @@ rephrase_prompt: |
           Do not enclose the rephrased prompt in quotes. You will be successful only if it returns a well-formed rephrased prompt ready for submission as an LLM request.
           User request: "{user_request}"
 
+
+```
+
+# workflows\yaml\Accounting Workflow.yaml
+
+```yaml
+agent_children: {}
+created_at: '2024-06-20T16:00:20.485947'
+description: "Create simple accounting app\n\rDevelop a intuitive and user-friendly\
+  \ accounting application that provides real-time financial tracking and reporting\
+  \ capabilities for small businesses and individuals. \n\nThe app should allow users\
+  \ to categorize and track income and expenses, automatically generating detailed\
+  \ reports and summaries. \n\nIt should also include features such as:\n\n* Budgeting\
+  \ tools to set financial goals and track progress\n* Invoicing and payment processing\
+  \ for customers\n* Multi-account support for separate tracking of personal and professional\
+  \ finances\n* Integration with popular payment gateways and bank accounts\n* Real-time\
+  \ analytics and insights to identify trends and make informed financial decisions\n\
+  \nUse simple and intuitive language, with clear and concise navigation and minimal\
+  \ clutter. The app should be accessible on desktop and mobile devices. \n\nProvide\
+  \ examples of common financial workflows and scenarios, such as:\n\n* Creating and\
+  \ sending invoices to customers\n* Tracking expenses for a small business\n* Creating\
+  \ and managing a personal budget\n\nConsider the following constraints:\n\n* Compliance\
+  \ with relevant financial regulations and data protection laws\n* User data encryption\
+  \ and secure storage\n* Adaptability to accommodate future changes in financial\
+  \ regulations and industry standards\n\nProvide detailed steps or guidelines for\
+  \ users to create and manage their accounts, including setup processes, login credentials,\
+  \ and password recovery procedures. \n\nOffer opportunities for users to provide\
+  \ feedback and suggest improvements, such as a rating system, comment sections,\
+  \ or survey mechanics."
+groupchat_config: {}
+id: 1
+name: Accounting Workflow
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-20T16:00:20.485947'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-20T16:00:20.485947'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-20T16:00:06.084418'
+type: twoagents
+updated_at: '2024-06-20T16:00:42.929738'
+user_id: user
+
+```
+
+# workflows\yaml\Bookkeeping Workflow.yaml
+
+```yaml
+agent_children: {}
+created_at: '2024-06-20T16:02:17.660468'
+description: "Develop a intuitive and user-friendly accounting application that provides\
+  \ real-time financial tracking and reporting capabilities for small businesses and\
+  \ individuals. \n\nThe app should allow users to categorize and track income and\
+  \ expenses, automatically generating detailed reports and summaries. \n\nIt should\
+  \ also include features such as:\n\n* Budgeting tools to set financial goals and\
+  \ track progress\n* Invoicing and payment processing for customers\n* Multi-account\
+  \ support for separate tracking of personal and professional finances\n* Integration\
+  \ with popular payment gateways and bank accounts\n* Real-time analytics and insights\
+  \ to identify trends and make informed financial decisions\n\nUse simple and intuitive\
+  \ language, with clear and concise navigation and minimal clutter. The app should\
+  \ be accessible on desktop and mobile devices. \n\nProvide examples of common financial\
+  \ workflows and scenarios, such as:\n\n* Creating and sending invoices to customers\n\
+  * Tracking expenses for a small business\n* Creating and managing a personal budget\n\
+  \nConsider the following constraints:\n\n* Compliance with relevant financial regulations\
+  \ and data protection laws\n* User data encryption and secure storage\n* Adaptability\
+  \ to accommodate future changes in financial regulations and industry standards\n\
+  \nProvide detailed steps or guidelines for users to create and manage their accounts,\
+  \ including setup processes, login credentials, and password recovery procedures.\
+  \ \n\nOffer opportunities for users to provide feedback and suggest improvements,\
+  \ such as a rating system, comment sections, or survey mechanics."
+groupchat_config: {}
+id: 1
+name: Bookkeeping Workflow
+receiver:
+  agents: []
+  config:
+    code_execution_config: null
+    default_auto_reply: ''
+    description: A primary assistant agent that writes plans and code to solve tasks.
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: Groq_Provider model configuration
+        model: llama3-8b-8192
+        timestamp: '2024-06-20T16:02:17.660468'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: primary_assistant
+    system_message: '...'
+  groupchat_config: {}
+  timestamp: '2024-06-20T16:02:17.660468'
+  tools: &id001 []
+  type: assistant
+  user_id: user
+sender:
+  config:
+    code_execution_config:
+      use_docker: false
+      work_dir: null
+    default_auto_reply: TERMINATE
+    description: A user proxy agent that executes code.
+    human_input_mode: NEVER
+    is_termination_msg: null
+    llm_config:
+      cache_seed: null
+      config_list:
+      - api_type: null
+        api_version: null
+        base_url: null
+        description: Groq_Provider model configuration
+        model: llama3-8b-8192
+        timestamp: '2024-06-20T16:02:17.660468'
+        user_id: default
+      extra_body: null
+      max_tokens: null
+      temperature: 0.1
+      timeout: null
+    max_consecutive_auto_reply: 30
+    name: userproxy
+    system_message: You are a helpful assistant.
+  timestamp: '2024-06-20T16:02:17.660468'
+  tools: *id001
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-20T16:02:17.660468'
+type: twoagents
+updated_at: null
+user_id: user
+
+```
+
+# workflows\yaml\New Workflow.yaml
+
+```yaml
+agent_children: {}
+created_at: '2024-06-20T16:08:01.566098'
+description: "Bookkeeper\n\rWrite a detailed description of a bookkeeper's tasks,\
+  \ responsibilities, and skills, including examples of their work, organizational\
+  \ habits, and time management strategies."
+groupchat_config: {}
+id: 1
+name: New Workflow
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-20T16:08:01.564605'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-20T16:08:01.564605'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-20T16:07:11.735808'
+type: twoagents
+updated_at: '2024-06-20T16:08:01.572448'
+user_id: user
 
 ```
 

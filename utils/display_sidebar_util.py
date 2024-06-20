@@ -2,65 +2,19 @@
 
 import streamlit as st
 
-from base_models.project_base_model import ProjectBaseModel
-from base_models.workflow_base_model import WorkflowBaseModel
 from configs.config_local import DEBUG
-from event_handlers.event_handlers_prompt import handle_prompt
-from event_handlers.event_handlers_shared import update_project
-from event_handlers.event_handlers_workflow import update_workflow
 from utils.display_agent_util import display_sidebar_agents
-
 
 def display_sidebar():
     if DEBUG:
         print("display_sidebar_message()")
   
-    selected_tab = st.sidebar.selectbox("Select a tab:", ["Home", "Prompt", "Agents", "Tools"])
-        
-    if selected_tab == "Home":    
-        display_sidebar_home()
-    elif selected_tab == "Prompt":
-        display_sidebar_prompt_reengineer()
-    elif selected_tab == "Agents":
-        display_sidebar_agents()
-    else:
-        st.write("Content for Tab 3")
-
     st.sidebar.image('gfx/AutoGroqLogo_sm.png')
-    
+    display_sidebar_home()
+    display_sidebar_agents()
 
 def display_sidebar_home():
     st.sidebar.write("<div class='teeny'>Need agents right frickin' now? : <a href='https://autogroq.streamlit.app/'>https://autogroq.streamlit.app/</a></div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>Universal AI Agents Made Easy. <br/> Theoretically.</div><p/>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny'>We're putting the 'mental' in 'experimental'.</div>", unsafe_allow_html=True)
     st.sidebar.write("<div class='teeny yellow'>No need to report what's broken, we know.</div><p/><br/><p/>", unsafe_allow_html=True)  
-
-
-def display_sidebar_prompt_reengineer():
-    if DEBUG:
-        print("display_sidebar_prompt_reengineer()")
-    
-    # Create the input field in the sidebar
-    st.sidebar.text_area("Quickstart - Enter your project request:", key="sidebar_prompt_input", on_change=(handle_sidebar_prompt_reengineer))
-
-    # Display the rephrased request if available
-    if "sidebar_prompt_output" in st.session_state:
-        st.sidebar.text_area("Rephrased Request:", value=st.session_state.sidebar_prompt_output, height=200)
-
-def handle_sidebar_prompt_reengineer():
-    if DEBUG:
-        print("handle_sidebar_prompt_reengineer()")
-    user_request = st.session_state.sidebar_prompt_input.strip()
-    result_text = handle_prompt(user_request, "prompts/rephrase_prompt.yaml", "rephrase_prompt")
-    if result_text:
-        st.session_state.sidebar_prompt_output = result_text
-        # Create new Project named "New Project" with the rephrased request as the 'prompt' property value
-        st.session_state.current_project = ProjectBaseModel(name="New Project", prompt=result_text)
-        st.session_state.current_project.create_project("New Project")
-        st.session_state.current_project.set_prompt(result_text)
-        st.session_state.current_workflow = WorkflowBaseModel(name="New Workflow")
-        st.session_state.current_workflow.create_workflow("New Workflow")
-        st.session_state.current_workflow.set_description(user_request + "\n\r" + result_text)
-
-        update_project()
-        update_workflow()

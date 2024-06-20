@@ -1,6 +1,7 @@
 # project_base_model.py
 
 import enum
+import json
 import os
 import yaml
 
@@ -61,6 +62,10 @@ class ProjectBaseModel:
         project_data = project.to_dict()
         with open(f"projects/yaml/{project_name}.yaml", "w") as file:
             yaml.dump(project_data, file)
+
+        # Create a JSON file for the project
+        with open(f"projects/json/{project_name}.json", "w") as file:
+            json.dump(project_data, file)
         
         return project
 
@@ -81,6 +86,11 @@ class ProjectBaseModel:
             if file.endswith(".yaml"):
                 project_name = file[:-5]  # Remove the ".yaml" extension
                 project_names.append(project_name)
+        if not project_names:
+            for file in os.listdir("projects/json"):
+                if file.endswith(".json"):
+                    project_name = file[:-5]  # Remove the ".json" extension
+                    project_names.append(project_name)
         return project_names
 
     def mark_deliverable_done(self, index: int):

@@ -1,0 +1,28 @@
+agent_children: {}
+created_at: '2024-06-20T16:08:01.566098'
+description: "Bookkeeper\n\rWrite a detailed description of a bookkeeper's tasks,\
+  \ responsibilities, and skills, including examples of their work, organizational\
+  \ habits, and time management strategies."
+groupchat_config: {}
+id: 1
+name: New Workflow
+receiver:
+  agents: []
+  config: {}
+  groupchat_config: {}
+  timestamp: '2024-06-20T16:08:01.564605'
+  tools: []
+  type: assistant
+  user_id: default
+sender:
+  config: {}
+  timestamp: '2024-06-20T16:08:01.564605'
+  tools: []
+  type: userproxy
+  user_id: user
+settings: {}
+summary_method: last
+timestamp: '2024-06-20T16:07:11.735808'
+type: twoagents
+updated_at: '2024-06-20T16:08:01.572448'
+user_id: user

@@ -1,5 +1,6 @@
 # workflow_base_model
 
+import json
 import os
 import streamlit as st
 import yaml
@@ -287,6 +288,10 @@ class WorkflowBaseModel:
         workflow_data = workflow.to_dict()
         with open(f"workflows/yaml/{workflow_name}.yaml", "w") as file:
             yaml.dump(workflow_data, file)
+
+        # Create a JSON file for the workflow
+        with open(f"workflows/json/{workflow_name}.json", "w") as file:
+            json.dump(workflow_data, file)
 
         return workflow
     

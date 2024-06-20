@@ -7,6 +7,9 @@ from configs.config_local import LLM_PROVIDER
 
 def initialize_session_variables():
 
+    if "agent_name_input" not in st.session_state:
+        st.session_state.agent_name_input = ""
+
     if "available_models" not in st.session_state:
         st.session_state.available_models = []
 
