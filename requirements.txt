@@ -3,4 +3,4 @@
 pyaml == 24.4.0
 pydantic == 2.7.3
 pydantic-core == 2.18.4
-streamlit==1.35.0
+streamlit >= 1.37.0
